@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "react": "19.2.5",
+    "react-hot-toast": "catalog:dev",
     "react-router": "catalog:fixture"
   },
   "devDependencies": {
