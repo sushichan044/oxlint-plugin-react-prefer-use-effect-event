@@ -9,7 +9,7 @@ const expectedDir = path.join(here, "expected");
 const targetDir = path.join(here, ".target");
 const configPath = path.join(here, "eslint.config.mjs");
 
-describe("e2e: react-stable-eslint", () => {
+describe("e2e: react-stable-eslint-espree", () => {
   beforeAll(() => {
     fs.rmSync(targetDir, { recursive: true, force: true });
     fs.cpSync(fixturesDir, targetDir, { recursive: true });
@@ -17,7 +17,7 @@ describe("e2e: react-stable-eslint", () => {
 
   const tc: Array<{ file: string; case: string }> = [
     {
-      file: "basic.tsx",
+      file: "basic.jsx",
       case: "works with useEffectEvent",
     },
   ];

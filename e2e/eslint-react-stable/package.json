@@ -14,7 +14,6 @@
     "@types/react": "^19.2.14",
     "eslint": "^10.2.1",
     "oxlint-plugin-react-prefer-use-effect-event": "workspace:*",
-    "typescript-eslint": "^8.59.1",
     "vitest": "catalog:dev"
   }
 }
