@@ -8,7 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(here, "fixtures");
 const expectedDir = path.join(here, "expected");
 const targetDir = path.join(here, ".target");
-const configPath = path.join(here, ".oxlintrc.json");
+const configPath = path.join(here, ".oxlintrc.e2e.json");
 
 describe("e2e: react-stable", () => {
   beforeAll(() => {
