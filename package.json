@@ -2,8 +2,16 @@
   "name": "oxlint-plugin-react-use-effect-event",
   "version": "0.0.0",
   "private": true,
-  "description": "",
-  "keywords": [],
+  "description": "An Oxlint / ESLint plugin that enforces the use of useEffectEvent across React codebases, compliant with project-specific conventions.",
+  "keywords": [
+    "eslingplugin",
+    "eslint",
+    "eslint-plugin",
+    "oxlint",
+    "oxlint-plugin",
+    "oxlintplugin",
+    "react"
+  ],
   "homepage": "https://github.com/sushichan044/oxlint-plugin-react-use-effect-event#readme",
   "bugs": {
     "url": "https://github.com/sushichan044/oxlint-plugin-react-use-effect-event/issues"
@@ -51,10 +59,9 @@
   "devDependencies": {
     "@arethetypeswrong/core": "catalog:dev",
     "@types/node": "catalog:dev",
-    "@typescript-eslint/utils": "catalog:prod",
     "@typescript/native-preview": "catalog:dev",
     "@virtual-live-lab/tsconfig": "catalog:dev",
-    "eslint": "catalog:dev",
+    "oxc-parser": "catalog:dev",
     "oxfmt": "catalog:dev",
     "oxlint": "catalog:dev",
     "oxlint-tsgolint": "catalog:dev",
@@ -64,7 +71,6 @@
     "release-it-pnpm": "catalog:dev",
     "tsdown": "catalog:dev",
     "typescript": "catalog:dev",
-    "typescript-eslint": "catalog:dev",
     "unplugin-unused": "catalog:dev",
     "vitest": "catalog:dev"
   },
