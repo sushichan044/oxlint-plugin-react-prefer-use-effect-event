@@ -1,10 +1,9 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+const here = import.meta.dirname;
 const fixturesDir = path.join(here, "fixtures");
 const expectedDir = path.join(here, "expected");
 const targetDir = path.join(here, ".target");
