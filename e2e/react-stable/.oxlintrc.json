@@ -1,0 +1,27 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "plugins": [],
+  "categories": {
+    "correctness": "off",
+    "nursery": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "suspicious": "off",
+    "pedantic": "off"
+  },
+  "jsPlugins": ["oxlint-plugin-react-use-effect-event"],
+  "rules": {
+    "oxlint-plugin-react-use-effect-event/prefer-use-effect-event": [
+      "error",
+      {
+        "targets": [
+          {
+            "source": { "from": "package", "package": "react-router", "name": "useNavigate" },
+            "derivation": { "kind": "call-return" }
+          }
+        ]
+      }
+    ]
+  }
+}

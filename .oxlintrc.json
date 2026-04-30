@@ -6,6 +6,7 @@
     "nursery": "error",
     "perf": "error"
   },
+  "ignorePatterns": ["e2e"],
   "env": {
     "builtin": true
   },

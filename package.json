@@ -48,8 +48,9 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "vitest --run",
+    "test:e2e": "pnpm run build && pnpm --filter \"./e2e/*\" run test",
     "tidy": "pnpm run lint && pnpm run format && pnpm run test",
-    "check": "pnpm run format:check && pnpm run lint:check && pnpm run test && pnpm run build",
+    "check": "pnpm run format:check && pnpm run lint:check && pnpm run test && pnpm run test:e2e",
     "build": "tsdown",
     "pkg-pr-new": "pkg-pr-new publish --compact --comment=update --pnpm"
   },
