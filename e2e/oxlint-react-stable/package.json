@@ -1,5 +1,5 @@
 {
-  "name": "e2e-react-stable",
+  "name": "e2e-oxlint-react-stable",
   "private": true,
   "type": "module",
   "scripts": {

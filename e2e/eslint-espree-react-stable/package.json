@@ -1,17 +1,18 @@
 {
-  "name": "e2e-react-experimental",
+  "name": "e2e-eslint-espree-react-stable",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "vitest --run"
   },
   "dependencies": {
-    "react": "0.0.0-experimental-73aa744b-20250702",
+    "react": "19.2.5",
     "react-router": "catalog:fixture"
   },
   "devDependencies": {
     "@types/node": "catalog:dev",
-    "@types/react": "^19.1.9",
+    "@types/react": "^19.2.14",
+    "eslint": "^10.2.1",
     "oxlint-plugin-react-prefer-use-effect-event": "workspace:*",
     "vitest": "catalog:dev"
   }
