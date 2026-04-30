@@ -138,7 +138,7 @@ importers:
       '@types/react':
         specifier: ^19.1.9
         version: 19.1.9
-      oxlint-plugin-react-use-effect-event:
+      oxlint-plugin-react-prefer-use-effect-event:
         specifier: workspace:*
         version: link:../..
       vitest:
@@ -163,7 +163,7 @@ importers:
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
-      oxlint-plugin-react-use-effect-event:
+      oxlint-plugin-react-prefer-use-effect-event:
         specifier: workspace:*
         version: link:../..
       vitest:

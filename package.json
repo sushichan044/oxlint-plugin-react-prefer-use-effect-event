@@ -1,5 +1,5 @@
 {
-  "name": "oxlint-plugin-react-use-effect-event",
+  "name": "oxlint-plugin-react-prefer-use-effect-event",
   "version": "0.0.0",
   "private": true,
   "description": "An Oxlint / ESLint plugin that enforces the use of useEffectEvent across React codebases, compliant with project-specific conventions.",
@@ -12,9 +12,9 @@
     "oxlintplugin",
     "react"
   ],
-  "homepage": "https://github.com/sushichan044/oxlint-plugin-react-use-effect-event#readme",
+  "homepage": "https://github.com/sushichan044/oxlint-plugin-react-prefer-use-effect-event#readme",
   "bugs": {
-    "url": "https://github.com/sushichan044/oxlint-plugin-react-use-effect-event/issues"
+    "url": "https://github.com/sushichan044/oxlint-plugin-react-prefer-use-effect-event/issues"
   },
   "license": "",
   "author": {
@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sushichan044/oxlint-plugin-react-use-effect-event.git"
+    "url": "git+https://github.com/sushichan044/oxlint-plugin-react-prefer-use-effect-event.git"
   },
   "funding": "https://github.com/sponsors/sushichan044",
   "files": [

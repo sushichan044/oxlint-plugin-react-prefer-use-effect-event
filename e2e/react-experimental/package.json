@@ -12,7 +12,7 @@
   "devDependencies": {
     "@types/node": "catalog:dev",
     "@types/react": "^19.1.9",
-    "oxlint-plugin-react-use-effect-event": "workspace:*",
+    "oxlint-plugin-react-prefer-use-effect-event": "workspace:*",
     "vitest": "catalog:dev"
   }
 }

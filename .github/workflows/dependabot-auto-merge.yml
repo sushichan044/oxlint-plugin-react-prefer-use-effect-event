@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   enable-auto-merge:
-    if: github.actor == 'dependabot[bot]' && github.repository == 'sushichan044/oxlint-plugin-react-use-effect-event'
+    if: github.actor == 'dependabot[bot]' && github.repository == 'sushichan044/oxlint-plugin-react-prefer-use-effect-event'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

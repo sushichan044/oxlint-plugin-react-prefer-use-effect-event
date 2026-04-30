@@ -10,9 +10,9 @@
     "suspicious": "off",
     "pedantic": "off"
   },
-  "jsPlugins": ["oxlint-plugin-react-use-effect-event"],
+  "jsPlugins": ["oxlint-plugin-react-prefer-use-effect-event"],
   "rules": {
-    "oxlint-plugin-react-use-effect-event/prefer-use-effect-event": [
+    "oxlint-plugin-react-prefer-use-effect-event/prefer-use-effect-event": [
       "error",
       {
         "experimentalUseEffectEvent": true,
