@@ -1,0 +1,72 @@
+{
+  "name": "oxlint-plugin-react-use-effect-event",
+  "version": "0.0.0",
+  "private": true,
+  "description": "",
+  "keywords": [],
+  "homepage": "https://github.com/sushichan044/oxlint-plugin-react-use-effect-event#readme",
+  "bugs": {
+    "url": "https://github.com/sushichan044/oxlint-plugin-react-use-effect-event/issues"
+  },
+  "license": "",
+  "author": {
+    "name": "sushichan044",
+    "url": "https://github.com/sushichan044"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sushichan044/oxlint-plugin-react-use-effect-event.git"
+  },
+  "funding": "https://github.com/sponsors/sushichan044",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "lint": "oxlint --max-warnings 0 --fix",
+    "lint:check": "oxlint --max-warnings 0",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "vitest --run",
+    "tidy": "pnpm run lint && pnpm run format && pnpm run test",
+    "check": "pnpm run format:check && pnpm run lint:check && pnpm run test && pnpm run build",
+    "build": "tsdown",
+    "pkg-pr-new": "pkg-pr-new publish --compact --comment=update --pnpm"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "catalog:prod"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "catalog:dev",
+    "@types/node": "catalog:dev",
+    "@typescript-eslint/utils": "catalog:prod",
+    "@typescript/native-preview": "catalog:dev",
+    "@virtual-live-lab/tsconfig": "catalog:dev",
+    "eslint": "catalog:dev",
+    "oxfmt": "catalog:dev",
+    "oxlint": "catalog:dev",
+    "oxlint-tsgolint": "catalog:dev",
+    "pkg-pr-new": "catalog:dev",
+    "publint": "catalog:dev",
+    "release-it": "catalog:dev",
+    "release-it-pnpm": "catalog:dev",
+    "tsdown": "catalog:dev",
+    "typescript": "catalog:dev",
+    "typescript-eslint": "catalog:dev",
+    "unplugin-unused": "catalog:dev",
+    "vitest": "catalog:dev"
+  },
+  "packageManager": "pnpm@11.0.1"
+}

@@ -1,0 +1,14 @@
+{
+  "languages": {
+    "TypeScript": {
+      "language_servers": ["tsgo"]
+    }
+  },
+  "formatter": [
+    {
+      "language_server": {
+        "name": "oxfmt"
+      }
+    }
+  ]
+}
