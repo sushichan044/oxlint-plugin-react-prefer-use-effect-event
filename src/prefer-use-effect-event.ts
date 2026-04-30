@@ -28,25 +28,62 @@ const USE_EFFECT_EVENT_EXPORT = "useEffectEvent";
 const EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT = "experimental_useEffectEvent";
 
 type ReactImportState = {
+  /**
+   * The `import ... from "react"` declaration node itself. Kept around so the autofix can mutate
+   * its specifier list (e.g. add `useEffectEvent`) without re-finding the declaration.
+   *
+   * @example
+   *   import React, { useEffect } from "react"; // this whole node
+   */
   node: ESTree.ImportDeclaration;
-  /** Variable bound to the named `useEffect` specifier, if present. */
+  /**
+   * Variable bound to the named `useEffect` specifier, if present. `null` when the file uses only a
+   * default/namespace import.
+   *
+   * @example
+   *   import { useEffect } from "react"; // the `useEffect` binding
+   *   import React from "react"; // null
+   */
   useEffectVariable: Variable | null;
   /**
    * Local name of the `useEffect` named specifier (i.e. the `as` alias if renamed). Used as a
    * fast-path filter before resolving identifier references.
+   *
+   * @example
+   *   import { useEffect } from "react"; // "useEffect"
+   *   import { useEffect as ue } from "react"; // "ue"
    */
   useEffectLocalName: string | null;
   /**
    * Local name under which `useEffectEvent` (or `experimental_useEffectEvent`) is already imported,
    * accounting for `as` aliases. `null` when no event binding is imported yet.
+   *
+   * @example
+   *   import { useEffectEvent } from "react"; // "useEffectEvent"
+   *   import { experimental_useEffectEvent as useEffectEvent } from "react"; // "useEffectEvent"
+   *   import { useEffect } from "react"; // null
    */
   useEffectEventLocalName: string | null;
   /**
    * Variable bound to the default or namespace specifier (e.g. `import React from "react"` or
    * `import * as React from "react"`). Used to recognise `React.useEffect(...)` calls.
+   *
+   * @example
+   *   import React from "react"; // the `React` binding
+   *   import * as React from "react"; // the `React` binding
+   *   import { useEffect } from "react"; // null
    */
   namespaceVariable: Variable | null;
-  /** Local name of the namespace/default specifier (e.g. `"React"`). */
+  /**
+   * Local name of the namespace/default specifier — used when emitting the wrapper callee in the
+   * `React.useEffectEvent` form.
+   *
+   * @example
+   *   import React from "react"; // "React"
+   *   import R from "react"; // "R"
+   *   import * as React from "react"; // "React"
+   *   import { useEffect } from "react"; // null
+   */
   namespaceLocalName: string | null;
 };
 
