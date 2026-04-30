@@ -1,41 +1,63 @@
 import type { ESTree, ScopeManager, Variable } from "@oxlint/plugins";
 
 /**
- * Find the `Variable` that an identifier reference resolves to using the scope manager.
+ * O(1) lookups of identifier-node → variable, backed by maps that are populated lazily on the first
+ * call.
  *
- * Returns `null` when: - The identifier is unresolved (e.g. references a global / undeclared name).
- * - The identifier does not appear as a `Reference` in any scope (e.g. it is a binding name).
+ * The naive alternative — walking every scope on every lookup — is O(scopes × variables) per call.
+ * Rules visit hundreds of identifiers per file, so the linear walk dominated the rule's runtime.
+ *
+ * One instance is created per file and discarded when the file is done.
  */
-export function findReferenceVariable(
-  scopeManager: ScopeManager,
-  identifier: ESTree.IdentifierReference | ESTree.IdentifierName,
-): Variable | null {
-  for (const scope of scopeManager.scopes) {
-    for (const ref of scope.references) {
-      if (ref.identifier === identifier) {
-        return ref.resolved;
-      }
-    }
-  }
-  return null;
-}
+export class ScopeIndex {
+  readonly #scopeManager: ScopeManager;
+  #references: Map<unknown, Variable | null> | null = null;
+  #declarations: Map<unknown, Variable> | null = null;
 
-/**
- * Get the `Variable` declared at the given binding identifier.
- *
- * Searches every scope in the scope manager for a variable whose first declaration identifier is
- * the given node.
- */
-export function findDeclaredVariable(
-  scopeManager: ScopeManager,
-  binding: ESTree.BindingIdentifier,
-): Variable | null {
-  for (const scope of scopeManager.scopes) {
-    for (const variable of scope.variables) {
-      for (const id of variable.identifiers) {
-        if (id === binding) return variable;
-      }
-    }
+  constructor(scopeManager: ScopeManager) {
+    this.#scopeManager = scopeManager;
   }
-  return null;
+
+  /**
+   * Resolve an identifier reference to its declared `Variable`.
+   *
+   * Returns `null` for unresolved (e.g. global) references and for identifiers that aren't a
+   * reference (e.g. binding identifiers).
+   */
+  resolveReference(
+    identifier: ESTree.IdentifierReference | ESTree.IdentifierName,
+  ): Variable | null {
+    let map = this.#references;
+    if (!map) {
+      map = new Map();
+      for (const scope of this.#scopeManager.scopes) {
+        for (const ref of scope.references) {
+          map.set(ref.identifier, ref.resolved);
+        }
+      }
+      this.#references = map;
+    }
+    return map.get(identifier) ?? null;
+  }
+
+  /**
+   * Resolve a binding identifier to the `Variable` it declares.
+   *
+   * Returns `null` when the node is not a binding identifier in any scope.
+   */
+  resolveDeclaration(binding: ESTree.BindingIdentifier): Variable | null {
+    let map = this.#declarations;
+    if (!map) {
+      map = new Map();
+      for (const scope of this.#scopeManager.scopes) {
+        for (const variable of scope.variables) {
+          for (const id of variable.identifiers) {
+            map.set(id, variable);
+          }
+        }
+      }
+      this.#declarations = map;
+    }
+    return map.get(binding) ?? null;
+  }
 }
