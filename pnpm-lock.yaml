@@ -48,9 +48,6 @@ catalogs:
     tsdown:
       specifier: 0.21.10
       version: 0.21.10
-    typescript:
-      specifier: ^6.0.3
-      version: 6.0.3
     unplugin-unused:
       specifier: ^0.5.7
       version: 0.5.7
@@ -114,7 +111,7 @@ importers:
         specifier: catalog:dev
         version: 0.21.10(@arethetypeswrong/core@0.18.2)(@typescript/native-preview@7.0.0-dev.20260430.1)(publint@0.3.18)(typescript@6.0.3)(unplugin-unused@0.5.7)
       typescript:
-        specifier: catalog:dev
+        specifier: 6.0.3
         version: 6.0.3
       unplugin-unused:
         specifier: catalog:dev
@@ -179,11 +176,11 @@ importers:
   e2e/oxlint-react-experimental:
     dependencies:
       react:
-        specifier: 0.0.0-experimental-73aa744b-20250702
-        version: 0.0.0-experimental-73aa744b-20250702
+        specifier: 19.2.5
+        version: 19.2.5
       react-router:
         specifier: catalog:fixture
-        version: 7.14.2(react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702))(react@0.0.0-experimental-73aa744b-20250702)
+        version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
     devDependencies:
       '@types/node':
         specifier: catalog:dev
@@ -2478,10 +2475,6 @@ packages:
     peerDependenciesMeta:
       react-dom:
         optional: true
-
-  react@0.0.0-experimental-73aa744b-20250702:
-    resolution: {integrity: sha512-QetGHHtKZEpbH005T+OoW6wJmNET/LOruRqyadpgiBvDDZao3WdwkknWRubxhMm4sP2Qh1fvPj014gja++pMWg==}
-    engines: {node: '>=0.10.0'}
 
   react@19.2.5:
     resolution: {integrity: sha512-llUJLzz1zTUBrskt2pwZgLq59AemifIftw4aB7JxOqf1HY2FDaGDxgwpAPVzHU1kdWabH7FauP4i1oEeer2WCA==}
@@ -4975,12 +4968,6 @@ snapshots:
       defu: 6.1.4
       destr: 2.0.5
 
-  react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702):
-    dependencies:
-      react: 0.0.0-experimental-73aa744b-20250702
-      scheduler: 0.27.0
-    optional: true
-
   react-dom@19.2.5(react@19.2.5):
     dependencies:
       react: 19.2.5
@@ -4993,14 +4980,6 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  react-router@7.14.2(react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702))(react@0.0.0-experimental-73aa744b-20250702):
-    dependencies:
-      cookie: 1.1.1
-      react: 0.0.0-experimental-73aa744b-20250702
-      set-cookie-parser: 2.7.2
-    optionalDependencies:
-      react-dom: 19.2.5(react@0.0.0-experimental-73aa744b-20250702)
-
   react-router@7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       cookie: 1.1.1
@@ -5008,8 +4987,6 @@ snapshots:
       set-cookie-parser: 2.7.2
     optionalDependencies:
       react-dom: 19.2.5(react@19.2.5)
-
-  react@0.0.0-experimental-73aa744b-20250702: {}
 
   react@19.2.5: {}
 

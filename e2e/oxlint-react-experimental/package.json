@@ -6,7 +6,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "react": "0.0.0-experimental-73aa744b-20250702",
+    "react": "19.2.5",
     "react-router": "catalog:fixture"
   },
   "devDependencies": {
