@@ -10,6 +10,13 @@ import { spanRange } from "./utils";
 
 type TargetOption = {
   targets: TargetSpec[];
+  /**
+   * Set this to true if you are using this plugin in an environment where React exports
+   * `experimental_useEffectEvent`.
+   *
+   * @default false
+   */
+  experimentalUseEffectEvent?: boolean;
 };
 
 export type Options = [TargetOption?];
@@ -50,6 +57,11 @@ const preferUseEffectEvent = defineRule({
       {
         type: "object",
         properties: {
+          experimentalUseEffectEvent: {
+            type: "boolean",
+            description:
+              "Set this to true if you are using this plugin in an environment where React exports `experimental_useEffectEvent`.",
+          },
           targets: {
             type: "array",
             items: {
@@ -123,6 +135,8 @@ const preferUseEffectEvent = defineRule({
   },
   createOnce: (context) => {
     let fileTargets: TargetSpec[] = [];
+    // Some experimental React versions export `experimental_useEffectEvent` instead of `useEffectEvent`...
+    let useEffectEventExportName = USE_EFFECT_EVENT_EXPORT;
 
     // Per-file state. `before` is not guaranteed to fire, so reset on `Program` too.
     let trackedImports = new Map<Variable, TargetSpec>();
@@ -137,7 +151,11 @@ const preferUseEffectEvent = defineRule({
 
     return {
       before() {
-        fileTargets = (context.options as Options | null)?.[0]?.targets ?? [];
+        const opts = (context.options as Options | null)?.[0];
+        fileTargets = opts?.targets ?? [];
+        useEffectEventExportName = opts?.experimentalUseEffectEvent
+          ? EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT
+          : USE_EFFECT_EVENT_EXPORT;
       },
 
       Program: () => {
@@ -236,6 +254,7 @@ const preferUseEffectEvent = defineRule({
           const handlerName = element.name;
           const eventName = `${handlerName}Event`;
           const capturedReactImport = reactImport;
+          const capturedExportName = useEffectEventExportName;
 
           context.report({
             node: element,
@@ -245,7 +264,10 @@ const preferUseEffectEvent = defineRule({
               const src = context.sourceCode.getText();
               const fixes = [];
 
-              const eventCalleeText = resolveEventCalleeText(capturedReactImport);
+              const eventCalleeText = resolveEventCalleeText(
+                capturedReactImport,
+                capturedExportName,
+              );
 
               // 1. Add useEffectEvent to the named React imports if it isn't there yet.
               if (
@@ -260,10 +282,7 @@ const preferUseEffectEvent = defineRule({
                 // add a named one — the fix uses `<ns>.useEffectEvent` instead.
                 if (lastNamed) {
                   fixes.push(
-                    fixer.insertTextAfterRange(
-                      spanRange(lastNamed),
-                      `, ${USE_EFFECT_EVENT_EXPORT}`,
-                    ),
+                    fixer.insertTextAfterRange(spanRange(lastNamed), `, ${capturedExportName}`),
                   );
                 }
               }
@@ -314,19 +333,18 @@ const preferUseEffectEvent = defineRule({
  * 1. An existing `useEffectEvent` (or `experimental_useEffectEvent`) named import — use the local
  *    name.
  * 2. A React namespace/default import with no named specifiers — use `<ns>.useEffectEvent`.
- * 3. Otherwise — use `useEffectEvent` (it will be added to the named imports by the accompanying fix
- *    step).
+ * 3. Otherwise — use the export name determined by options (added to named imports by the fix).
  */
-function resolveEventCalleeText(reactImport: ReactImportState | null): string {
-  if (reactImport === null) return USE_EFFECT_EVENT_EXPORT;
+function resolveEventCalleeText(reactImport: ReactImportState | null, exportName: string): string {
+  if (reactImport === null) return exportName;
   if (reactImport.useEffectEventLocalName !== null) {
     return reactImport.useEffectEventLocalName;
   }
   const hasNamedSpecifier = reactImport.node.specifiers.some((s) => s.type === "ImportSpecifier");
   if (!hasNamedSpecifier && reactImport.namespaceLocalName !== null) {
-    return `${reactImport.namespaceLocalName}.${USE_EFFECT_EVENT_EXPORT}`;
+    return `${reactImport.namespaceLocalName}.${exportName}`;
   }
-  return USE_EFFECT_EVENT_EXPORT;
+  return exportName;
 }
 
 /**

@@ -6,7 +6,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "react": "19.1.0-canary-ef4bc8b4-20250328",
+    "react": "0.0.0-experimental-73aa744b-20250702",
     "react-router": "catalog:fixture"
   },
   "devDependencies": {

@@ -15,6 +15,7 @@
     "oxlint-plugin-react-use-effect-event/prefer-use-effect-event": [
       "error",
       {
+        "experimentalUseEffectEvent": true,
         "targets": [
           {
             "source": { "from": "package", "package": "react-router", "name": "useNavigate" },

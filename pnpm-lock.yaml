@@ -126,11 +126,11 @@ importers:
   e2e/react-experimental:
     dependencies:
       react:
-        specifier: 19.1.0-canary-ef4bc8b4-20250328
-        version: 19.1.0-canary-ef4bc8b4-20250328
+        specifier: 0.0.0-experimental-73aa744b-20250702
+        version: 0.0.0-experimental-73aa744b-20250702
       react-router:
         specifier: catalog:fixture
-        version: 7.14.2(react-dom@19.2.5(react@19.1.0-canary-ef4bc8b4-20250328))(react@19.1.0-canary-ef4bc8b4-20250328)
+        version: 7.14.2(react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702))(react@0.0.0-experimental-73aa744b-20250702)
     devDependencies:
       '@types/node':
         specifier: catalog:dev
@@ -2170,8 +2170,8 @@ packages:
       react-dom:
         optional: true
 
-  react@19.1.0-canary-ef4bc8b4-20250328:
-    resolution: {integrity: sha512-NF+yoh0fDGIlIVX+MRC1Ah76O+oBW5YOG6VtAlLftPT+kwhWgfoAgJVpI/rgCUANBm5gLlLkdRmLVBS3UOWZfw==}
+  react@0.0.0-experimental-73aa744b-20250702:
+    resolution: {integrity: sha512-QetGHHtKZEpbH005T+OoW6wJmNET/LOruRqyadpgiBvDDZao3WdwkknWRubxhMm4sP2Qh1fvPj014gja++pMWg==}
     engines: {node: '>=0.10.0'}
 
   react@19.2.5:
@@ -4340,9 +4340,9 @@ snapshots:
       defu: 6.1.4
       destr: 2.0.5
 
-  react-dom@19.2.5(react@19.1.0-canary-ef4bc8b4-20250328):
+  react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702):
     dependencies:
-      react: 19.1.0-canary-ef4bc8b4-20250328
+      react: 0.0.0-experimental-73aa744b-20250702
       scheduler: 0.27.0
     optional: true
 
@@ -4358,13 +4358,13 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  react-router@7.14.2(react-dom@19.2.5(react@19.1.0-canary-ef4bc8b4-20250328))(react@19.1.0-canary-ef4bc8b4-20250328):
+  react-router@7.14.2(react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702))(react@0.0.0-experimental-73aa744b-20250702):
     dependencies:
       cookie: 1.1.1
-      react: 19.1.0-canary-ef4bc8b4-20250328
+      react: 0.0.0-experimental-73aa744b-20250702
       set-cookie-parser: 2.7.2
     optionalDependencies:
-      react-dom: 19.2.5(react@19.1.0-canary-ef4bc8b4-20250328)
+      react-dom: 19.2.5(react@0.0.0-experimental-73aa744b-20250702)
 
   react-router@7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
@@ -4374,7 +4374,7 @@ snapshots:
     optionalDependencies:
       react-dom: 19.2.5(react@19.2.5)
 
-  react@19.1.0-canary-ef4bc8b4-20250328: {}
+  react@0.0.0-experimental-73aa744b-20250702: {}
 
   react@19.2.5: {}
 
