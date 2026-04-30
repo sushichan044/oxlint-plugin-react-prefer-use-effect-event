@@ -1,9 +1,12 @@
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree, ScopeManager, Variable } from "@oxlint/plugins";
 import type { TargetSpec } from "./types";
 
 import { defineRule } from "@oxlint/plugins";
+import { collectCallSitesOfVariable } from "./ast-utils";
+import { findDeclaredVariable, findReferenceVariable } from "./scope-utils";
+import { matchPackageTarget } from "./tracked-imports";
+import { extractHandlersFromDeclarator } from "./tracked-handlers";
 import { spanRange } from "./utils";
-import { collectCallsToName, getModuleExportName } from "./ast-utils";
 
 type TargetOption = {
   targets: TargetSpec[];
@@ -11,6 +14,10 @@ type TargetOption = {
 
 export type Options = [TargetOption?];
 type MessageIds = "preferUseEffectEvent";
+
+const REACT_PACKAGE = "react";
+const USE_EFFECT_EXPORT = "useEffect";
+const USE_EFFECT_EVENT_EXPORT = "useEffectEvent";
 
 const preferUseEffectEvent = defineRule({
   meta: {
@@ -30,38 +37,59 @@ const preferUseEffectEvent = defineRule({
               type: "object",
               properties: {
                 source: {
-                  type: "object",
-                  properties: {
-                    from: { enum: ["package"] },
-                    package: { type: "string" },
-                    name: { type: "string" },
-                  },
-                  required: ["from", "package", "name"],
-                },
-                derivation: {
-                  type: "object",
                   oneOf: [
                     {
+                      type: "object",
+                      properties: {
+                        from: { const: "package" },
+                        package: { type: "string" },
+                        name: { type: "string" },
+                      },
+                      required: ["from", "package", "name"],
+                      additionalProperties: false,
+                    },
+                    {
+                      type: "object",
+                      properties: {
+                        from: { const: "file" },
+                        path: { type: "string" },
+                        name: { type: "string" },
+                      },
+                      required: ["from", "path", "name"],
+                      additionalProperties: false,
+                    },
+                  ],
+                },
+                derivation: {
+                  oneOf: [
+                    {
+                      type: "object",
                       properties: {
                         kind: { const: "direct" },
                       },
                       required: ["kind"],
+                      additionalProperties: false,
                     },
                     {
+                      type: "object",
                       properties: {
                         kind: { const: "call-return" },
                       },
                       required: ["kind"],
+                      additionalProperties: false,
                     },
                     {
+                      type: "object",
                       properties: {
                         kind: { const: "call-return-properties" },
-                        propertiesList: {
+                        properties: {
                           type: "array",
                           items: { type: "string" },
+                          minItems: 1,
                         },
                       },
-                      required: ["kind", "propertiesList"],
+                      required: ["kind", "properties"],
+                      additionalProperties: false,
                     },
                   ],
                 },
@@ -75,113 +103,145 @@ const preferUseEffectEvent = defineRule({
     ],
   },
   createOnce: (context) => {
-    // context.options is null when createOnce is called during plugin registration;
-    // read it lazily only once.
     let fileTargets: TargetSpec[] = [];
 
-    // These must be reset for each file.
-    const trackedImports = new Map<string, TargetSpec>();
-    const trackedHandlers = new Set<string>();
+    // Per-file state. `before` is not guaranteed to fire, so reset on `Program` too.
+    let trackedImports = new Map<Variable, TargetSpec>();
+    let trackedHandlers = new Map<Variable, TargetSpec>();
     let reactImportNode: ESTree.ImportDeclaration | null = null;
+    let reactUseEffectVariable: Variable | null = null;
+
+    function resetState() {
+      trackedImports = new Map();
+      trackedHandlers = new Map();
+      reactImportNode = null;
+      reactUseEffectVariable = null;
+    }
 
     return {
       before() {
         fileTargets = (context.options as Options | null)?.[0]?.targets ?? [];
       },
 
-      // We need to clear the tracked imports and handlers at the beginning of each file.
-      // And `before` hooks is NOT guaranteed to run on every file.
-      // https://oxc.rs/docs/guide/usage/linter/writing-js-plugins.html#before-hook
       Program: () => {
-        trackedImports.clear();
-        trackedHandlers.clear();
-        reactImportNode = null;
+        resetState();
       },
 
       ImportDeclaration(node) {
-        if (node.source.value === "react") {
+        const { scopeManager } = context.sourceCode;
+
+        if (node.source.value === REACT_PACKAGE) {
           reactImportNode = node;
-        }
-
-        for (const target of fileTargets) {
-          const { source } = target;
-          if (source.from !== "package") continue;
-          if (node.source.value !== source.package) continue;
-
           for (const specifier of node.specifiers) {
             if (specifier.type !== "ImportSpecifier") continue;
-            if (getModuleExportName(specifier.imported) !== source.name) continue;
-            trackedImports.set(specifier.local.name, target);
+            if (specifier.imported.type !== "Identifier") continue;
+            if (specifier.imported.name !== USE_EFFECT_EXPORT) continue;
+            reactUseEffectVariable = findDeclaredVariable(scopeManager, specifier.local);
+          }
+        }
+
+        for (const specifier of node.specifiers) {
+          if (specifier.type !== "ImportSpecifier") continue;
+
+          const target = matchPackageTarget(specifier, node.source.value, fileTargets);
+          if (!target) continue;
+
+          const variable = findDeclaredVariable(scopeManager, specifier.local);
+          if (!variable) continue;
+
+          trackedImports.set(variable, target);
+
+          // For `direct` derivations the imported binding *is* the handler.
+          if (target.derivation.kind === "direct") {
+            trackedHandlers.set(variable, target);
           }
         }
       },
 
       VariableDeclarator(node) {
-        if (!node.init || node.init.type !== "CallExpression") return;
-        const { callee } = node.init;
-        if (callee.type !== "Identifier") return;
-        const target = trackedImports.get(callee.name);
-        if (!target || target.derivation.kind !== "call-return") return;
-        if (node.id.type !== "Identifier") return;
-        trackedHandlers.add(node.id.name);
+        const { scopeManager } = context.sourceCode;
+
+        const handlers = extractHandlersFromDeclarator(node, (callee) => {
+          const variable = findReferenceVariable(scopeManager, callee);
+          if (!variable) return null;
+          return trackedImports.get(variable) ?? null;
+        });
+
+        for (const handler of handlers) {
+          const variable = findDeclaredVariable(scopeManager, handler.binding);
+          if (variable) trackedHandlers.set(variable, handler.target);
+        }
       },
 
       CallExpression(node) {
-        if (node.callee.type !== "Identifier") return;
-        if (node.callee.name !== "useEffect") return;
-        if (node.arguments.length < 2) return;
+        const { scopeManager } = context.sourceCode;
+
+        if (!isUseEffectCall(node, reactUseEffectVariable, scopeManager)) return;
+
         const depsArg = node.arguments[1];
         if (!depsArg || depsArg.type !== "ArrayExpression") return;
 
         for (const element of depsArg.elements) {
           if (!element || element.type !== "Identifier") continue;
-          const { name } = element;
-          if (!trackedHandlers.has(name)) continue;
 
-          const eventName = `${name}Event`;
+          const variable = findReferenceVariable(scopeManager, element);
+          if (!variable) continue;
+          if (!trackedHandlers.has(variable)) continue;
+
+          const handlerName = element.name;
+          const eventName = `${handlerName}Event`;
           const capturedReactImport = reactImportNode;
 
           context.report({
             node: element,
             messageId: "preferUseEffectEvent",
-            data: { handlerName: name },
+            data: { handlerName },
             fix(fixer) {
               const src = context.sourceCode.getText();
               const fixes = [];
 
-              // 1. Add useEffectEvent to React import
+              // 1. Add useEffectEvent to the React import (if not already there).
               if (capturedReactImport !== null) {
                 const lastSpecifier =
                   capturedReactImport.specifiers[capturedReactImport.specifiers.length - 1];
-                if (lastSpecifier) {
+                const alreadyImported = capturedReactImport.specifiers.some(
+                  (spec) =>
+                    spec.type === "ImportSpecifier" &&
+                    spec.imported.type === "Identifier" &&
+                    spec.imported.name === USE_EFFECT_EVENT_EXPORT,
+                );
+                if (lastSpecifier && !alreadyImported) {
                   fixes.push(
-                    fixer.insertTextAfterRange(spanRange(lastSpecifier), `, useEffectEvent`),
+                    fixer.insertTextAfterRange(
+                      spanRange(lastSpecifier),
+                      `, ${USE_EFFECT_EVENT_EXPORT}`,
+                    ),
                   );
                 }
               }
 
-              // 2. Insert new variable declaration before useEffect call
+              // 2. Insert the wrapping declaration just before the useEffect call.
               const lineStart = src.lastIndexOf("\n", node.start - 1) + 1;
               const indent = src.slice(lineStart, node.start);
               fixes.push(
                 fixer.insertTextBeforeRange(
                   spanRange(node),
-                  `const ${eventName} = useEffectEvent(${name});\n${indent}`,
+                  `const ${eventName} = ${USE_EFFECT_EVENT_EXPORT}(${handlerName});\n${indent}`,
                 ),
               );
 
-              // 3. Replace handler calls in the callback with the wrapped event name
+              // 3. Replace handler call sites within the callback body.
               const callbackArg = node.arguments[0];
               if (callbackArg?.type === "ArrowFunctionExpression") {
                 const { body } = callbackArg;
                 if (body.type === "BlockStatement") {
-                  for (const call of collectCallsToName(body, name)) {
+                  for (const call of collectCallSitesOfVariable(variable, body)) {
                     fixes.push(fixer.replaceTextRange(spanRange(call.callee), eventName));
                   }
                 }
               }
 
-              // 4. Remove handler from dependency array
+              // 4. Drop the handler from the dependency array.
               const remaining: string[] = [];
               for (const e of depsArg.elements) {
                 if (!e || e.start === element.start) continue;
@@ -197,5 +257,25 @@ const preferUseEffectEvent = defineRule({
     };
   },
 });
+
+/**
+ * Decide whether a `CallExpression` is the React `useEffect` we care about.
+ *
+ * If we have resolved the React `useEffect` import to a `Variable`, require the callee to resolve
+ * to it. Otherwise fall back to a name-only check, which keeps the rule working even when the React
+ * import hasn't been seen yet (e.g. a file with no React import at all but with a configured target
+ * — unlikely, but harmless).
+ */
+function isUseEffectCall(
+  node: ESTree.CallExpression,
+  reactUseEffectVariable: Variable | null,
+  scopeManager: ScopeManager,
+): boolean {
+  if (node.callee.type !== "Identifier") return false;
+  if (reactUseEffectVariable) {
+    return findReferenceVariable(scopeManager, node.callee) === reactUseEffectVariable;
+  }
+  return node.callee.name === USE_EFFECT_EXPORT;
+}
 
 export default preferUseEffectEvent;

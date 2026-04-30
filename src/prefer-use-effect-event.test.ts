@@ -14,61 +14,398 @@ const ruleTester = new RuleTester({
   },
 });
 
-const options = [
+const callReturnOptions = [
   {
     targets: [
       {
-        source: {
-          from: "package",
-          package: "react-router",
-          name: "useNavigate",
-        },
-        derivation: {
-          kind: "call-return",
-        },
+        source: { from: "package", package: "react-router", name: "useNavigate" },
+        derivation: { kind: "call-return" },
       },
     ],
   },
 ] satisfies Options;
 
-describe("prefer-use-effect-event-for-effect-deps", () => {
-  it("works", () => {
-    expect(() => {
-      ruleTester.run("prefer-use-effect-event-for-effect-deps", preferUseEffectEvent, {
-        valid: [],
-        invalid: [
-          {
-            code: `import { useEffect } from "react";
-      import { useNavigate } from "react-router";
+const directOptions = [
+  {
+    targets: [
+      {
+        source: { from: "package", package: "pkg", name: "notify" },
+        derivation: { kind: "direct" },
+      },
+    ],
+  },
+] satisfies Options;
 
-      const Component = () => {
-        const navigate = useNavigate();
-        useEffect(() => {
-          navigate("/path");
-        }, [navigate]);
-      };`,
-            errors: [
-              {
-                messageId: "preferUseEffectEvent",
-                data: {
-                  handlerName: "navigate",
-                },
-              },
-            ],
-            output: `import { useEffect, useEffectEvent } from "react";
-      import { useNavigate } from "react-router";
+const callReturnPropertiesOptions = [
+  {
+    targets: [
+      {
+        source: { from: "package", package: "pkg", name: "useNotify" },
+        derivation: { kind: "call-return-properties", properties: ["notify"] },
+      },
+    ],
+  },
+] satisfies Options;
 
-      const Component = () => {
-        const navigate = useNavigate();
-        const navigateEvent = useEffectEvent(navigate);
-        useEffect(() => {
-          navigateEvent("/path");
-        }, []);
-      };`,
-            options,
-          },
-        ],
-      });
-    }).not.toThrow();
+function runRule(testCases: Parameters<typeof ruleTester.run>[2]): void {
+  ruleTester.run("prefer-use-effect-event", preferUseEffectEvent, testCases);
+}
+
+describe("prefer-use-effect-event", () => {
+  describe("call-return derivation", () => {
+    it("rewrites a useEffect that depends on a hook return value", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("works through `import as` rename of the source hook", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate as useNav } from "react-router";
+
+const Component = () => {
+  const navigate = useNav();
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate as useNav } from "react-router";
+
+const Component = () => {
+  const navigate = useNav();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag a same-named local function in an inner scope", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              // The `navigate` in deps is a local helper inside Component, NOT the
+              // value returned from `useNavigate()`. The plugin must not touch this.
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  function navigate() {}
+  useEffect(() => {
+    navigate();
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("ignores call-return when the binding is destructured", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const { navigate } = useNavigate();
+  useEffect(() => {
+    navigate();
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("direct derivation", () => {
+    it("rewrites a useEffect that depends on a directly imported handler", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  useEffect(() => {
+    notify();
+  }, [notify]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "notify" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  const notifyEvent = useEffectEvent(notify);
+  useEffect(() => {
+    notifyEvent();
+  }, []);
+};`,
+              options: directOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("works through `import as` rename for direct imports", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { notify as alert } from "pkg";
+
+const Component = () => {
+  useEffect(() => {
+    alert();
+  }, [alert]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "alert" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { notify as alert } from "pkg";
+
+const Component = () => {
+  const alertEvent = useEffectEvent(alert);
+  useEffect(() => {
+    alertEvent();
+  }, []);
+};`,
+              options: directOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag a shadowing local of the same name", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  const notify = () => {};
+  useEffect(() => {
+    notify();
+  }, [notify]);
+};`,
+              options: directOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("call-return-properties derivation", () => {
+    it("rewrites a useEffect that depends on a destructured property", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNotify } from "pkg";
+
+const Component = () => {
+  const { notify } = useNotify();
+  useEffect(() => {
+    notify();
+  }, [notify]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "notify" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNotify } from "pkg";
+
+const Component = () => {
+  const { notify } = useNotify();
+  const notifyEvent = useEffectEvent(notify);
+  useEffect(() => {
+    notifyEvent();
+  }, []);
+};`,
+              options: callReturnPropertiesOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites when the destructured property is renamed locally", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNotify } from "pkg";
+
+const Component = () => {
+  const { notify: send } = useNotify();
+  useEffect(() => {
+    send();
+  }, [send]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "send" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNotify } from "pkg";
+
+const Component = () => {
+  const { notify: send } = useNotify();
+  const sendEvent = useEffectEvent(send);
+  useEffect(() => {
+    sendEvent();
+  }, []);
+};`,
+              options: callReturnPropertiesOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("ignores destructured properties that are not in the configured list", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNotify } from "pkg";
+
+const Component = () => {
+  const { warn } = useNotify();
+  useEffect(() => {
+    warn();
+  }, [warn]);
+};`,
+              options: callReturnPropertiesOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("scope-aware behavior", () => {
+    it("ignores calls to a same-named binding from another module", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "other-pkg";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate();
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not rewrite calls of a same-named identifier inside an inner block", () => {
+      // The fix should only rewrite call sites that resolve to the SAME variable
+      // as the dependency. The inner `navigate` is a different variable.
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/outer");
+    {
+      const navigate = () => {};
+      navigate();
+    }
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/outer");
+    {
+      const navigate = () => {};
+      navigate();
+    }
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
   });
 });
