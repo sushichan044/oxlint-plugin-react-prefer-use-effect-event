@@ -45,9 +45,6 @@ catalogs:
     tsdown:
       specifier: 0.21.10
       version: 0.21.10
-    typescript:
-      specifier: ^6.0.3
-      version: 6.0.3
     unplugin-unused:
       specifier: ^0.5.7
       version: 0.5.7
@@ -111,7 +108,7 @@ importers:
         specifier: catalog:dev
         version: 0.21.10(@arethetypeswrong/core@0.18.2)(@typescript/native-preview@7.0.0-dev.20260430.1)(publint@0.3.18)(typescript@6.0.3)(unplugin-unused@0.5.7)
       typescript:
-        specifier: catalog:dev
+        specifier: 6.0.3
         version: 6.0.3
       unplugin-unused:
         specifier: catalog:dev
