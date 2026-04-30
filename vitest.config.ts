@@ -16,12 +16,14 @@ export default defineConfig({
           include: ["**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
           exclude: [...defaultExclude, "**/e2e/**"],
         },
+        extends: true,
       },
       {
         test: {
           name: "e2e",
           include: ["e2e/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
         },
+        extends: true,
       },
     ],
   },
