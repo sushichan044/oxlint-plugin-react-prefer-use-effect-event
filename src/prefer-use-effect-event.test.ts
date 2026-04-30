@@ -408,4 +408,228 @@ const Component = () => {
       }).not.toThrow();
     });
   });
+
+  describe("experimental_useEffectEvent React versions", () => {
+    it("reuses an existing experimental_useEffectEvent named import", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect, experimental_useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, experimental_useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = experimental_useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("reuses the local name when experimental_useEffectEvent is imported with `as`", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect, experimental_useEffectEvent as useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, experimental_useEffectEvent as useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("default / namespace React import", () => {
+    it("rewrites `React.useEffect` calls to use `React.useEffectEvent`", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import React from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  React.useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import React from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = React.useEffectEvent(navigate);
+  React.useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("works for `import * as React` namespace imports too", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import * as React from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  React.useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import * as React from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = React.useEffectEvent(navigate);
+  React.useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("respects an aliased default React import", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import R from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  R.useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import R from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = R.useEffectEvent(navigate);
+  R.useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("ignores `Other.useEffect` member calls that are not React", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import Other from "other-pkg";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  Other.useEffect(() => {
+    navigate();
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("uses the named useEffectEvent specifier when both default and named are imported", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import React, { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import React, { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+  });
 });

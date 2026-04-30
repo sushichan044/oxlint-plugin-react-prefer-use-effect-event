@@ -18,6 +18,25 @@ type MessageIds = "preferUseEffectEvent";
 const REACT_PACKAGE = "react";
 const USE_EFFECT_EXPORT = "useEffect";
 const USE_EFFECT_EVENT_EXPORT = "useEffectEvent";
+const EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT = "experimental_useEffectEvent";
+
+type ReactImportState = {
+  node: ESTree.ImportDeclaration;
+  /** Variable bound to the named `useEffect` specifier, if present. */
+  useEffectVariable: Variable | null;
+  /**
+   * Local name under which `useEffectEvent` (or `experimental_useEffectEvent`) is already imported,
+   * accounting for `as` aliases. `null` when no event binding is imported yet.
+   */
+  useEffectEventLocalName: string | null;
+  /**
+   * Variable bound to the default or namespace specifier (e.g. `import React from "react"` or
+   * `import * as React from "react"`). Used to recognise `React.useEffect(...)` calls.
+   */
+  namespaceVariable: Variable | null;
+  /** Local name of the namespace/default specifier (e.g. `"React"`). */
+  namespaceLocalName: string | null;
+};
 
 const preferUseEffectEvent = defineRule({
   meta: {
@@ -108,14 +127,12 @@ const preferUseEffectEvent = defineRule({
     // Per-file state. `before` is not guaranteed to fire, so reset on `Program` too.
     let trackedImports = new Map<Variable, TargetSpec>();
     let trackedHandlers = new Map<Variable, TargetSpec>();
-    let reactImportNode: ESTree.ImportDeclaration | null = null;
-    let reactUseEffectVariable: Variable | null = null;
+    let reactImport: ReactImportState | null = null;
 
     function resetState() {
       trackedImports = new Map();
       trackedHandlers = new Map();
-      reactImportNode = null;
-      reactUseEffectVariable = null;
+      reactImport = null;
     }
 
     return {
@@ -131,13 +148,41 @@ const preferUseEffectEvent = defineRule({
         const { scopeManager } = context.sourceCode;
 
         if (node.source.value === REACT_PACKAGE) {
-          reactImportNode = node;
+          let useEffectVariable: Variable | null = null;
+          let useEffectEventLocalName: string | null = null;
+          let namespaceVariable: Variable | null = null;
+          let namespaceLocalName: string | null = null;
+
           for (const specifier of node.specifiers) {
+            if (
+              specifier.type === "ImportDefaultSpecifier" ||
+              specifier.type === "ImportNamespaceSpecifier"
+            ) {
+              namespaceVariable = findDeclaredVariable(scopeManager, specifier.local);
+              namespaceLocalName = specifier.local.name;
+              continue;
+            }
             if (specifier.type !== "ImportSpecifier") continue;
             if (specifier.imported.type !== "Identifier") continue;
-            if (specifier.imported.name !== USE_EFFECT_EXPORT) continue;
-            reactUseEffectVariable = findDeclaredVariable(scopeManager, specifier.local);
+
+            const importedName = specifier.imported.name;
+            if (importedName === USE_EFFECT_EXPORT) {
+              useEffectVariable = findDeclaredVariable(scopeManager, specifier.local);
+            } else if (
+              importedName === USE_EFFECT_EVENT_EXPORT ||
+              importedName === EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT
+            ) {
+              useEffectEventLocalName = specifier.local.name;
+            }
           }
+
+          reactImport = {
+            node,
+            useEffectVariable,
+            useEffectEventLocalName,
+            namespaceVariable,
+            namespaceLocalName,
+          };
         }
 
         for (const specifier of node.specifiers) {
@@ -176,7 +221,7 @@ const preferUseEffectEvent = defineRule({
       CallExpression(node) {
         const { scopeManager } = context.sourceCode;
 
-        if (!isUseEffectCall(node, reactUseEffectVariable, scopeManager)) return;
+        if (!isUseEffectCall(node, reactImport, scopeManager)) return;
 
         const depsArg = node.arguments[1];
         if (!depsArg || depsArg.type !== "ArrayExpression") return;
@@ -190,7 +235,7 @@ const preferUseEffectEvent = defineRule({
 
           const handlerName = element.name;
           const eventName = `${handlerName}Event`;
-          const capturedReactImport = reactImportNode;
+          const capturedReactImport = reactImport;
 
           context.report({
             node: element,
@@ -200,20 +245,23 @@ const preferUseEffectEvent = defineRule({
               const src = context.sourceCode.getText();
               const fixes = [];
 
-              // 1. Add useEffectEvent to the React import (if not already there).
-              if (capturedReactImport !== null) {
-                const lastSpecifier =
-                  capturedReactImport.specifiers[capturedReactImport.specifiers.length - 1];
-                const alreadyImported = capturedReactImport.specifiers.some(
-                  (spec) =>
-                    spec.type === "ImportSpecifier" &&
-                    spec.imported.type === "Identifier" &&
-                    spec.imported.name === USE_EFFECT_EVENT_EXPORT,
+              const eventCalleeText = resolveEventCalleeText(capturedReactImport);
+
+              // 1. Add useEffectEvent to the named React imports if it isn't there yet.
+              if (
+                capturedReactImport !== null &&
+                capturedReactImport.useEffectEventLocalName === null
+              ) {
+                const namedSpecifiers = capturedReactImport.node.specifiers.filter(
+                  (s): s is ESTree.ImportSpecifier => s.type === "ImportSpecifier",
                 );
-                if (lastSpecifier && !alreadyImported) {
+                const lastNamed = namedSpecifiers[namedSpecifiers.length - 1];
+                // When the import has only a default/namespace specifier we don't need to
+                // add a named one — the fix uses `<ns>.useEffectEvent` instead.
+                if (lastNamed) {
                   fixes.push(
                     fixer.insertTextAfterRange(
-                      spanRange(lastSpecifier),
+                      spanRange(lastNamed),
                       `, ${USE_EFFECT_EVENT_EXPORT}`,
                     ),
                   );
@@ -226,7 +274,7 @@ const preferUseEffectEvent = defineRule({
               fixes.push(
                 fixer.insertTextBeforeRange(
                   spanRange(node),
-                  `const ${eventName} = ${USE_EFFECT_EVENT_EXPORT}(${handlerName});\n${indent}`,
+                  `const ${eventName} = ${eventCalleeText}(${handlerName});\n${indent}`,
                 ),
               );
 
@@ -259,23 +307,61 @@ const preferUseEffectEvent = defineRule({
 });
 
 /**
+ * Decide which expression text to use as the wrapper callee.
+ *
+ * Priority:
+ *
+ * 1. An existing `useEffectEvent` (or `experimental_useEffectEvent`) named import — use the local
+ *    name.
+ * 2. A React namespace/default import with no named specifiers — use `<ns>.useEffectEvent`.
+ * 3. Otherwise — use `useEffectEvent` (it will be added to the named imports by the accompanying fix
+ *    step).
+ */
+function resolveEventCalleeText(reactImport: ReactImportState | null): string {
+  if (reactImport === null) return USE_EFFECT_EVENT_EXPORT;
+  if (reactImport.useEffectEventLocalName !== null) {
+    return reactImport.useEffectEventLocalName;
+  }
+  const hasNamedSpecifier = reactImport.node.specifiers.some((s) => s.type === "ImportSpecifier");
+  if (!hasNamedSpecifier && reactImport.namespaceLocalName !== null) {
+    return `${reactImport.namespaceLocalName}.${USE_EFFECT_EVENT_EXPORT}`;
+  }
+  return USE_EFFECT_EVENT_EXPORT;
+}
+
+/**
  * Decide whether a `CallExpression` is the React `useEffect` we care about.
  *
- * If we have resolved the React `useEffect` import to a `Variable`, require the callee to resolve
- * to it. Otherwise fall back to a name-only check, which keeps the rule working even when the React
- * import hasn't been seen yet (e.g. a file with no React import at all but with a configured target
- * — unlikely, but harmless).
+ * Recognises both the named-import form (`useEffect(...)`) and the namespace/default form
+ * (`React.useEffect(...)`). For the namespace form we require the `React` reference to resolve to
+ * the tracked default/namespace specifier — otherwise we ignore it (an unrelated `React.useEffect`
+ * member call cannot exist without an import binding in scope).
+ *
+ * For the named form, when the React `useEffect` import has not been resolved to a `Variable` we
+ * fall back to a name-only check, which keeps the rule working on files that don't import React at
+ * all but configure a target — unlikely, but harmless.
  */
 function isUseEffectCall(
   node: ESTree.CallExpression,
-  reactUseEffectVariable: Variable | null,
+  reactImport: ReactImportState | null,
   scopeManager: ScopeManager,
 ): boolean {
-  if (node.callee.type !== "Identifier") return false;
-  if (reactUseEffectVariable) {
-    return findReferenceVariable(scopeManager, node.callee) === reactUseEffectVariable;
+  if (node.callee.type === "Identifier") {
+    if (reactImport?.useEffectVariable) {
+      return findReferenceVariable(scopeManager, node.callee) === reactImport.useEffectVariable;
+    }
+    return node.callee.name === USE_EFFECT_EXPORT;
   }
-  return node.callee.name === USE_EFFECT_EXPORT;
+  if (node.callee.type === "MemberExpression" && !node.callee.computed) {
+    if (node.callee.property.type !== "Identifier") return false;
+    if (node.callee.property.name !== USE_EFFECT_EXPORT) return false;
+    if (node.callee.object.type !== "Identifier") return false;
+    if (!reactImport?.namespaceVariable) return false;
+    return (
+      findReferenceVariable(scopeManager, node.callee.object) === reactImport.namespaceVariable
+    );
+  }
+  return false;
 }
 
 export default preferUseEffectEvent;
