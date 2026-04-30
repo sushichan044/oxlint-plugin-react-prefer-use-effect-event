@@ -29,6 +29,12 @@ export default defineConfig({
           include: ["e2e/react-experimental/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
         },
       },
+      {
+        test: {
+          name: "e2e-react-stable-eslint",
+          include: ["e2e/react-stable-eslint/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+        },
+      },
     ],
   },
 });

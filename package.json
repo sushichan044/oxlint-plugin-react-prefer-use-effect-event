@@ -49,9 +49,9 @@
     "format:check": "oxfmt --check",
     "test": "vitest --run",
     "test:unit": "pnpm run test --project unit",
-    "test:e2e": "pnpm run build && pnpm run test --project e2e-react-stable --project e2e-react-experimental",
+    "test:e2e": "pnpm run build && pnpm run test --project e2e-react-stable --project e2e-react-experimental --project e2e-react-stable-eslint",
     "tidy": "pnpm run lint && pnpm run format && pnpm run test",
-    "check": "pnpm run format:check && pnpm run lint:check && pnpm run test && pnpm run test:e2e",
+    "check": "pnpm run format:check && pnpm run lint:check && pnpm run test:unit && pnpm run test:e2e",
     "build": "tsdown",
     "pkg-pr-new": "pkg-pr-new publish --compact --comment=update --pnpm"
   },

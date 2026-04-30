@@ -1,0 +1,20 @@
+{
+  "name": "e2e-react-stable-eslint",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "react": "19.2.5",
+    "react-router": "catalog:fixture"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:dev",
+    "@types/react": "^19.2.14",
+    "eslint": "^10.2.1",
+    "oxlint-plugin-react-prefer-use-effect-event": "workspace:*",
+    "typescript-eslint": "^8.59.1",
+    "vitest": "catalog:dev"
+  }
+}
