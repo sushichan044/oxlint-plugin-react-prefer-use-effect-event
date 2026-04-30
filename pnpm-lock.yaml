@@ -179,18 +179,18 @@ importers:
   e2e/oxlint-react-experimental:
     dependencies:
       react:
-        specifier: 0.0.0-experimental-73aa744b-20250702
-        version: 0.0.0-experimental-73aa744b-20250702
+        specifier: 19.2.5
+        version: 19.2.5
       react-router:
         specifier: catalog:fixture
-        version: 7.14.2(react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702))(react@0.0.0-experimental-73aa744b-20250702)
+        version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
     devDependencies:
       '@types/node':
         specifier: catalog:dev
         version: 25.6.0
       '@types/react':
-        specifier: 19.1.9
-        version: 19.1.9
+        specifier: 19.2.14
+        version: 19.2.14
       oxlint-plugin-react-prefer-use-effect-event:
         specifier: workspace:*
         version: link:../..
@@ -1231,9 +1231,6 @@ packages:
   '@types/parse-path@7.1.0':
     resolution: {integrity: sha512-EULJ8LApcVEPbrfND0cRQqutIOdiIgJ1Mgrhpy755r14xMohPTEpkV/k28SJvuOs9bHRFW8x+KeDAEPiGQPB9Q==}
     deprecated: This is a stub types definition. parse-path provides its own type definitions, so you do not need this installed.
-
-  '@types/react@19.1.9':
-    resolution: {integrity: sha512-WmdoynAX8Stew/36uTSVMcLJJ1KRh6L3IZRx1PZ7qJtBqT3dYTgyDTx8H1qoRghErydW7xw9mSJ3wS//tCRpFA==}
 
   '@types/react@19.2.14':
     resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
@@ -2439,10 +2436,6 @@ packages:
       react-dom:
         optional: true
 
-  react@0.0.0-experimental-73aa744b-20250702:
-    resolution: {integrity: sha512-QetGHHtKZEpbH005T+OoW6wJmNET/LOruRqyadpgiBvDDZao3WdwkknWRubxhMm4sP2Qh1fvPj014gja++pMWg==}
-    engines: {node: '>=0.10.0'}
-
   react@19.2.5:
     resolution: {integrity: sha512-llUJLzz1zTUBrskt2pwZgLq59AemifIftw4aB7JxOqf1HY2FDaGDxgwpAPVzHU1kdWabH7FauP4i1oEeer2WCA==}
     engines: {node: '>=0.10.0'}
@@ -3636,10 +3629,6 @@ snapshots:
   '@types/parse-path@7.1.0':
     dependencies:
       parse-path: 7.1.0
-
-  '@types/react@19.1.9':
-    dependencies:
-      csstype: 3.2.3
 
   '@types/react@19.2.14':
     dependencies:
@@ -4876,12 +4865,6 @@ snapshots:
       defu: 6.1.7
       destr: 2.0.5
 
-  react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702):
-    dependencies:
-      react: 0.0.0-experimental-73aa744b-20250702
-      scheduler: 0.27.0
-    optional: true
-
   react-dom@19.2.5(react@19.2.5):
     dependencies:
       react: 19.2.5
@@ -4894,14 +4877,6 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  react-router@7.14.2(react-dom@19.2.5(react@0.0.0-experimental-73aa744b-20250702))(react@0.0.0-experimental-73aa744b-20250702):
-    dependencies:
-      cookie: 1.1.1
-      react: 0.0.0-experimental-73aa744b-20250702
-      set-cookie-parser: 2.7.2
-    optionalDependencies:
-      react-dom: 19.2.5(react@0.0.0-experimental-73aa744b-20250702)
-
   react-router@7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       cookie: 1.1.1
@@ -4909,8 +4884,6 @@ snapshots:
       set-cookie-parser: 2.7.2
     optionalDependencies:
       react-dom: 19.2.5(react@19.2.5)
-
-  react@0.0.0-experimental-73aa744b-20250702: {}
 
   react@19.2.5: {}
 
