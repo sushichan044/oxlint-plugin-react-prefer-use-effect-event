@@ -19,20 +19,8 @@ export default defineConfig({
       },
       {
         test: {
-          name: "e2e-react-stable",
-          include: ["e2e/react-stable/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-        },
-      },
-      {
-        test: {
-          name: "e2e-react-experimental",
-          include: ["e2e/react-experimental/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-        },
-      },
-      {
-        test: {
-          name: "e2e-react-stable-eslint",
-          include: ["e2e/react-stable-eslint/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+          name: "e2e",
+          include: ["e2e/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
         },
       },
     ],

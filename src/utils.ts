@@ -1,8 +1,8 @@
 import type { Range } from "@oxlint/plugins";
 import { parseSync } from "oxc-parser";
 
-export function spanRange(node: { start: number; end: number }): Range {
-  return [node.start, node.end];
+export function spanRange(node: { range: Range }): Range {
+  return node.range;
 }
 
 export function pasrseAsOxlint(filename: string, code: string) {

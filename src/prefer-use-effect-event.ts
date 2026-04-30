@@ -295,8 +295,9 @@ const preferUseEffectEvent = defineRule({
               }
 
               // 2. Insert the wrapping declaration just before the useEffect call.
-              const lineStart = src.lastIndexOf("\n", node.start - 1) + 1;
-              const indent = src.slice(lineStart, node.start);
+              const [nodeStart] = node.range;
+              const lineStart = src.lastIndexOf("\n", nodeStart - 1) + 1;
+              const indent = src.slice(lineStart, nodeStart);
               fixes.push(
                 fixer.insertTextBeforeRange(
                   spanRange(node),
@@ -317,9 +318,12 @@ const preferUseEffectEvent = defineRule({
 
               // 4. Drop the handler from the dependency array.
               const remaining: string[] = [];
+              const [elementStart] = element.range;
               for (const e of depsArg.elements) {
-                if (!e || e.start === element.start) continue;
-                remaining.push(src.slice(e.start, e.end));
+                if (!e) continue;
+                const [eStart, eEnd] = e.range;
+                if (eStart === elementStart) continue;
+                remaining.push(src.slice(eStart, eEnd));
               }
               fixes.push(fixer.replaceTextRange(spanRange(depsArg), `[${remaining.join(", ")}]`));
 

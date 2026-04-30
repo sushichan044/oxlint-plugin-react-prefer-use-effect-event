@@ -1,4 +1,4 @@
-import type { ESTree, Variable } from "@oxlint/plugins";
+import type { ESTree, Range, Variable } from "@oxlint/plugins";
 
 export function getModuleExportName(name: ESTree.ModuleExportName): string {
   return name.type === "Identifier" ? name.name : name.value;
@@ -27,12 +27,14 @@ export function getDirectParentCall(node: ESTree.Node): ESTree.CallExpression | 
  */
 export function collectCallSitesOfVariable(
   variable: Variable,
-  range: { start: number; end: number },
+  range: { range: Range },
 ): ESTree.CallExpression[] {
+  const [rangeStart, rangeEnd] = range.range;
   const results: ESTree.CallExpression[] = [];
   for (const ref of variable.references) {
     const id = ref.identifier;
-    if (id.start < range.start || id.end > range.end) continue;
+    const [idStart, idEnd] = id.range;
+    if (idStart < rangeStart || idEnd > rangeEnd) continue;
     const call = getDirectParentCall(id);
     if (call) results.push(call);
   }
