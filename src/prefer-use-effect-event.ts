@@ -151,11 +151,18 @@ const preferUseEffectEvent = defineRule({
 
     return {
       before() {
+        // Skip the file if it doesn't contain useEffect at all.
+        if (!context.sourceCode.text.includes(USE_EFFECT_EXPORT)) {
+          return false;
+        }
+
         const opts = (context.options as Options | null)?.[0];
         fileTargets = opts?.targets ?? [];
         useEffectEventExportName = opts?.experimentalUseEffectEvent
           ? EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT
           : USE_EFFECT_EVENT_EXPORT;
+
+        return true;
       },
 
       Program: () => {
