@@ -91,6 +91,10 @@ const preferUseEffectEvent = defineRule({
   meta: {
     defaultOptions: [] satisfies Options,
     type: "problem",
+    docs: {
+      description:
+        "Wrap event handlers passed into `useEffect` with `useEffectEvent` to avoid stale closures and unnecessary effect re-runs.",
+    },
     messages: {
       preferUseEffectEvent: "Wrap the call of {{handlerName}} with useEffectEvent.",
     } satisfies Record<MessageIds, string>,
@@ -98,80 +102,115 @@ const preferUseEffectEvent = defineRule({
     schema: [
       {
         type: "object",
+        additionalProperties: false,
         properties: {
           experimentalUseEffectEvent: {
             type: "boolean",
             description:
-              "Set this to true if you are using this plugin in an environment where React exports `experimental_useEffectEvent`.",
+              "Set to `true` for React versions that export `experimental_useEffectEvent` instead of the stable `useEffectEvent`.",
           },
           targets: {
             type: "array",
+            description:
+              "Handler bindings inside `useEffect` that should be wrapped with `useEffectEvent`.",
             items: {
               type: "object",
+              additionalProperties: false,
+              required: ["source", "derivation"],
               properties: {
                 source: {
+                  description: "Where the handler binding originates.",
                   oneOf: [
                     {
                       type: "object",
-                      properties: {
-                        from: { const: "package" },
-                        package: { type: "string" },
-                        name: { type: "string" },
-                      },
-                      required: ["from", "package", "name"],
                       additionalProperties: false,
+                      required: ["from", "package", "name"],
+                      properties: {
+                        from: {
+                          const: "package",
+                          description: "Track an export from an npm package.",
+                        },
+                        package: {
+                          type: "string",
+                          description: "npm package name to import the handler from.",
+                        },
+                        name: {
+                          type: "string",
+                          description: "Named export to track on the package.",
+                        },
+                      },
                     },
                     {
                       type: "object",
-                      properties: {
-                        from: { const: "file" },
-                        path: { type: "string" },
-                        name: { type: "string" },
-                      },
-                      required: ["from", "path", "name"],
                       additionalProperties: false,
+                      required: ["from", "path", "name"],
+                      properties: {
+                        from: {
+                          const: "file",
+                          description: "Track an export from a project-local file.",
+                        },
+                        path: {
+                          type: "string",
+                          description: "Project-relative path to the file declaring the export.",
+                        },
+                        name: {
+                          type: "string",
+                          description: "Named export to track on the file.",
+                        },
+                      },
                     },
                   ],
                 },
                 derivation: {
+                  description: "How the handler is obtained from `source`.",
                   oneOf: [
                     {
                       type: "object",
-                      properties: {
-                        kind: { const: "direct" },
-                      },
-                      required: ["kind"],
                       additionalProperties: false,
+                      required: ["kind"],
+                      properties: {
+                        kind: {
+                          const: "direct",
+                          description: "The imported binding itself is the handler.",
+                        },
+                      },
                     },
                     {
                       type: "object",
-                      properties: {
-                        kind: { const: "call-return" },
-                      },
-                      required: ["kind"],
                       additionalProperties: false,
+                      required: ["kind"],
+                      properties: {
+                        kind: {
+                          const: "call-return",
+                          description:
+                            "The handler is the return value of calling the imported binding.",
+                        },
+                      },
                     },
                     {
                       type: "object",
+                      additionalProperties: false,
+                      required: ["kind", "properties"],
                       properties: {
-                        kind: { const: "call-return-properties" },
+                        kind: {
+                          const: "call-return-properties",
+                          description:
+                            "The handler is one or more properties of the value returned by calling the imported binding.",
+                        },
                         properties: {
                           type: "array",
                           items: { type: "string" },
                           minItems: 1,
+                          description: "Property names on the call's return value to track.",
                         },
                       },
-                      required: ["kind", "properties"],
-                      additionalProperties: false,
                     },
                   ],
                 },
               },
-              required: ["source", "derivation"],
             },
           },
         },
-        additionalProperties: false,
       },
     ],
   },

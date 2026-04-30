@@ -31,10 +31,12 @@
   ],
   "type": "module",
   "sideEffects": false,
+  "main": "./dist/index.mjs",
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -53,6 +55,7 @@
     "tidy": "pnpm run lint && pnpm run format && pnpm run test",
     "check": "pnpm run format:check && pnpm run lint:check && pnpm run test:unit && pnpm run test:e2e",
     "build": "tsdown",
+    "docs:generate": "eslint-doc-generator",
     "pkg-pr-new": "pkg-pr-new publish --compact --comment=update --pnpm"
   },
   "dependencies": {
@@ -63,6 +66,8 @@
     "@types/node": "catalog:dev",
     "@typescript/native-preview": "catalog:dev",
     "@virtual-live-lab/tsconfig": "catalog:dev",
+    "eslint": "catalog:dev",
+    "eslint-doc-generator": "catalog:dev",
     "oxc-parser": "catalog:dev",
     "oxfmt": "catalog:dev",
     "oxlint": "catalog:dev",
