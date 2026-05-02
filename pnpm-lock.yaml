@@ -110,6 +110,9 @@ importers:
       eslint-doc-generator:
         specifier: catalog:dev
         version: 3.3.2(eslint@9.39.2(jiti@2.6.1))(typescript@6.0.3)
+      fs-fixture:
+        specifier: ^2.13.0
+        version: 2.13.0
       oxc-parser:
         specifier: catalog:dev
         version: 0.128.0
@@ -2132,6 +2135,10 @@ packages:
 
   flatted@3.4.2:
     resolution: {integrity: sha512-PjDse7RzhcPkIJwy5t7KPWQSZ9cAbzQXcafsetQoD7sOJRQlGikNbx7yZp2OotDnJyrDcbyRq3Ttb18iYOqkxA==}
+
+  fs-fixture@2.13.0:
+    resolution: {integrity: sha512-bqL4EVFNgoA38OnztLfeHn4NZJ32zWnSNA3ALtessYO0WjpL//QuYl1YkYd7j+TY0cLO6cqgoHxPJpfSwKQAPA==}
+    engines: {node: '>=18.0.0'}
 
   fs-minipass@2.1.0:
     resolution: {integrity: sha512-V/JgOLFCS+R6Vcq0slCuaeWEdNC3ouDlJMNIsacH2VtALiu9mV4LPrHc5cDl8k5aw6J8jwgWWpiTo5RYhmIzvg==}
@@ -4994,6 +5001,8 @@ snapshots:
       keyv: 4.5.4
 
   flatted@3.4.2: {}
+
+  fs-fixture@2.13.0: {}
 
   fs-minipass@2.1.0:
     dependencies:

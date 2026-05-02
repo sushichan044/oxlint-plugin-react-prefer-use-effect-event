@@ -4,8 +4,8 @@
  * The plugin walks upwards from the file being linted to find the nearest oxlint config
  * (`.oxlintrc.json` or `oxlint.config.{ts,mts,cts,js,mjs,cjs}`) and treats `path` as relative to
  * that config's directory. Each import site is resolved through unrs-resolver using the nearest
- * `tsconfig.json`, so TS path aliases (`paths` / `baseUrl`) and relative imports both reduce to the
- * same absolute path before comparison.
+ * `tsconfig.json`, so TS path aliases (`paths`) and relative imports both reduce to the same
+ * absolute path before comparison.
  */
 type FileSource = {
   from: "file";

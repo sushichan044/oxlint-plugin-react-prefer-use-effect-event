@@ -55,7 +55,7 @@ export function findOxlintConfigDir(filename: string): string | null {
 /**
  * Walk upwards from the directory containing `filename` to find the nearest `tsconfig.json`.
  * Returns the absolute path to that tsconfig, or `null` if none exists. Used to feed unrs-resolver
- * with the right TS path/baseUrl context so aliases (e.g. `@/hooks/...`) resolve correctly.
+ * with the right TS path context so aliases (e.g. `@/hooks/...`) resolve correctly.
  */
 export function findTsconfig(filename: string): string | null {
   const startDir = path.dirname(filename);
