@@ -3,7 +3,8 @@ import type { TargetSpec } from "./types";
 
 import { defineRule } from "@oxlint/plugins";
 import { collectCallSitesOfVariable } from "./ast-utils";
-import { findOxlintConfigDir, resolveImportSource } from "./resolver";
+import { Resolver } from "./resolver";
+
 import { ScopeIndex } from "./scope-utils";
 import { matchModuleTarget } from "./tracked-imports";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
@@ -217,6 +218,7 @@ const preferUseEffectEvent = defineRule({
     ],
   },
   createOnce: (context) => {
+    const resolver = new Resolver();
     let fileTargets: TargetSpec[] = [];
     let hasFileTargets = false;
     // Some experimental React versions export `experimental_useEffectEvent` instead of `useEffectEvent`...
@@ -244,7 +246,7 @@ const preferUseEffectEvent = defineRule({
 
     function ensureConfigDir(): string | null {
       if (configDir === undefined) {
-        configDir = hasFileTargets ? findOxlintConfigDir(context.physicalFilename) : null;
+        configDir = hasFileTargets ? resolver.findOxlintConfigDir(context.physicalFilename) : null;
       }
       return configDir;
     }
@@ -285,7 +287,10 @@ const preferUseEffectEvent = defineRule({
         let resolvedImport: string | null | undefined;
         const getResolvedImport = (): string | null => {
           if (resolvedImport === undefined) {
-            resolvedImport = resolveImportSource(context.physicalFilename, node.source.value);
+            resolvedImport = resolver.resolveImportSource(
+              context.physicalFilename,
+              node.source.value,
+            );
           }
           return resolvedImport;
         };
