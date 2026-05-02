@@ -1,4 +1,12 @@
-/** Specifies that a handler is declared in `path` and the export is named `name`. */
+/**
+ * Specifies that a handler comes from a project-local file identified by its on-disk location.
+ *
+ * The plugin walks upwards from the file being linted to find the nearest oxlint config
+ * (`.oxlintrc.json` or `oxlint.config.{ts,mts,cts,js,mjs,cjs}`) and treats `path` as relative to
+ * that config's directory. Each import site is resolved through unrs-resolver using the nearest
+ * `tsconfig.json`, so TS path aliases (`paths` / `baseUrl`) and relative imports both reduce to the
+ * same absolute path before comparison.
+ */
 type FileSource = {
   from: "file";
   /**
@@ -9,7 +17,10 @@ type FileSource = {
    */
   name: string;
   /**
-   * The path to the file, relative to the project root.
+   * Path to the file declaring the export, **relative to the nearest oxlint config**.
+   *
+   * Use forward slashes; an explicit extension (e.g. `.ts`) is recommended so resolution is
+   * unambiguous.
    *
    * @example
    *   "src/hooks/useToast.ts";

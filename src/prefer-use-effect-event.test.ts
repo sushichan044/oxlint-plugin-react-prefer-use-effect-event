@@ -632,4 +632,8 @@ const Component = () => {
       }).not.toThrow();
     });
   });
+
+  // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
+  // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
+  // the dedicated resolver unit tests and the e2e fixture rigs.
 });

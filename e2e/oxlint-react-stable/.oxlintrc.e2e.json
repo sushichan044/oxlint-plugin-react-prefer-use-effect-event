@@ -19,6 +19,10 @@
           {
             "source": { "from": "package", "package": "react-router", "name": "useNavigate" },
             "derivation": { "kind": "call-return" }
+          },
+          {
+            "source": { "from": "file", "path": "hooks/useToast.ts", "name": "useToast" },
+            "derivation": { "kind": "call-return" }
           }
         ]
       }

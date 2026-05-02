@@ -20,6 +20,10 @@ describe("e2e: react-stable", () => {
       file: "basic.tsx",
       case: "works with useEffectEvent",
     },
+    {
+      file: "file-source/Component.tsx",
+      case: "resolves a file-source target through tsconfig paths",
+    },
   ];
 
   it.each(tc)("works with experimental_useEffectEvent", async ({ file }) => {

@@ -3,8 +3,9 @@ import type { TargetSpec } from "./types";
 
 import { defineRule } from "@oxlint/plugins";
 import { collectCallSitesOfVariable } from "./ast-utils";
+import { findOxlintConfigDir, resolveImportSource } from "./resolver";
 import { ScopeIndex } from "./scope-utils";
-import { matchPackageTarget } from "./tracked-imports";
+import { matchModuleTarget } from "./tracked-imports";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
 import { spanRange } from "./utils";
 
@@ -151,7 +152,8 @@ const preferUseEffectEvent = defineRule({
                         },
                         path: {
                           type: "string",
-                          description: "Project-relative path to the file declaring the export.",
+                          description:
+                            "Path to the file declaring the export, relative to the nearest oxlint config (`.oxlintrc.json` or `oxlint.config.*`). Imports are resolved through the nearest tsconfig so TS path aliases match too.",
                         },
                         name: {
                           type: "string",
@@ -216,6 +218,7 @@ const preferUseEffectEvent = defineRule({
   },
   createOnce: (context) => {
     let fileTargets: TargetSpec[] = [];
+    let hasFileTargets = false;
     // Some experimental React versions export `experimental_useEffectEvent` instead of `useEffectEvent`...
     let useEffectEventExportName = USE_EFFECT_EVENT_EXPORT;
 
@@ -224,12 +227,14 @@ const preferUseEffectEvent = defineRule({
     let trackedHandlers = new Map<Variable, TargetSpec>();
     let reactImport: ReactImportState | null = null;
     let scopeIndex: ScopeIndex | null = null;
+    let configDir: string | null | undefined;
 
     function resetState() {
       trackedImports = new Map();
       trackedHandlers = new Map();
       reactImport = null;
       scopeIndex = null;
+      configDir = undefined;
     }
 
     function ensureScopeIndex(): ScopeIndex {
@@ -237,10 +242,18 @@ const preferUseEffectEvent = defineRule({
       return scopeIndex;
     }
 
+    function ensureConfigDir(): string | null {
+      if (configDir === undefined) {
+        configDir = hasFileTargets ? findOxlintConfigDir(context.physicalFilename) : null;
+      }
+      return configDir;
+    }
+
     return {
       before() {
         const opts = (context.options as Options | null)?.[0];
         fileTargets = opts?.targets ?? [];
+        hasFileTargets = fileTargets.some((t) => t.source.from === "file");
         // No targets means no rule output is possible — skip the file entirely.
         if (fileTargets.length === 0) return false;
         // Skip the file if it doesn't contain useEffect at all.
@@ -266,6 +279,16 @@ const preferUseEffectEvent = defineRule({
         let useEffectEventLocalName: string | null = null;
         let namespaceVariable: Variable | null = null;
         let namespaceLocalName: string | null = null;
+
+        // Resolve the import source on demand — only file-source targets need it, and only if the
+        // `imported` name on a specifier matched first.
+        let resolvedImport: string | null | undefined;
+        const getResolvedImport = (): string | null => {
+          if (resolvedImport === undefined) {
+            resolvedImport = resolveImportSource(context.physicalFilename, node.source.value);
+          }
+          return resolvedImport;
+        };
 
         for (const specifier of node.specifiers) {
           // React-specific bookkeeping.
@@ -295,7 +318,10 @@ const preferUseEffectEvent = defineRule({
 
           // Tracked-import handling (any package, not just React).
           if (specifier.type !== "ImportSpecifier") continue;
-          const target = matchPackageTarget(specifier, node.source.value, fileTargets);
+          const target = matchModuleTarget(specifier, node.source.value, fileTargets, {
+            configDir: ensureConfigDir(),
+            getResolvedImport,
+          });
           if (!target) continue;
 
           const variable = ensureScopeIndex().resolveDeclaration(specifier.local);

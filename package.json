@@ -59,7 +59,9 @@
     "pkg-pr-new": "pkg-pr-new publish --compact --comment=update --pnpm"
   },
   "dependencies": {
-    "@oxlint/plugins": "catalog:prod"
+    "@oxlint/plugins": "catalog:prod",
+    "empathic": "catalog:prod",
+    "unrs-resolver": "catalog:prod"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "catalog:dev",
