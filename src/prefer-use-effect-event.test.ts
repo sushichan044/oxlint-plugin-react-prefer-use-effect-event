@@ -773,6 +773,197 @@ const Component = () => {
     });
   });
 
+  describe("event handler name conflict avoidance", () => {
+    it("renames when the default name is already declared in the same scope", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = "existing";
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+  return navigateEvent;
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = "existing";
+  const navigateEvent_1 = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent_1("/path");
+  }, []);
+  return navigateEvent;
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("renames when an outer scope already binds the default name", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const navigateEvent = "module-level";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+    console.log(navigateEvent);
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const navigateEvent = "module-level";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent_1 = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent_1("/path");
+    console.log(navigateEvent);
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("renames when a descendant scope inside the callback shadows the default name", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+    {
+      const navigateEvent = "shadow";
+      console.log(navigateEvent);
+    }
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent_1 = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent_1("/path");
+    {
+      const navigateEvent = "shadow";
+      console.log(navigateEvent);
+    }
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("walks the suffix counter when intermediate names are also taken", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = "a";
+  const navigateEvent_1 = "b";
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+  return [navigateEvent, navigateEvent_1];
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = "a";
+  const navigateEvent_1 = "b";
+  const navigateEvent_2 = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent_2("/path");
+  }, []);
+  return [navigateEvent, navigateEvent_1];
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("renames when the React import already aliases useEffectEvent to the default name", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect, useEffectEvent as navigateEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent as navigateEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent_1 = navigateEvent(navigate);
+  useEffect(() => {
+    navigateEvent_1("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+  });
+
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
   // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
   // the dedicated resolver unit tests and the e2e fixture rigs.

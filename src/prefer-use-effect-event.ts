@@ -5,7 +5,7 @@ import { defineRule } from "@oxlint/plugins";
 import { collectCallSitesOfVariable } from "./ast-utils";
 import { Resolver } from "./resolver";
 
-import { ScopeIndex } from "./scope-utils";
+import { findAvailableBindingName, ScopeIndex } from "./scope-utils";
 import { matchModuleTarget } from "./tracked-imports";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
 import { getRuleDocsURL } from "./utils";
@@ -391,7 +391,8 @@ const preferUseEffectEvent = defineRule({
           if (!trackedHandlers.has(variable)) continue;
 
           const handlerName = element.name;
-          const eventName = `${handlerName}Event`;
+          const insertScope = context.sourceCode.getScope(node);
+          const eventName = findAvailableBindingName(`${handlerName}Event`, insertScope);
           const capturedReactImport = reactImport;
           const capturedExportName = useEffectEventExportName;
 

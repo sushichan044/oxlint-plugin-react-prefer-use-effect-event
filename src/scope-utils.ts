@@ -1,4 +1,4 @@
-import type { ESTree, ScopeManager, Variable } from "@oxlint/plugins";
+import type { ESTree, Scope, ScopeManager, Variable } from "@oxlint/plugins";
 
 /**
  * O(1) lookups of identifier-node → variable, backed by maps that are populated lazily on the first
@@ -60,4 +60,40 @@ export class ScopeIndex {
     }
     return map.get(binding) ?? null;
   }
+}
+
+/**
+ * Pick a binding name based on `base` that won't collide with anything visible from `insertScope`
+ * and won't be shadowed by anything declared in a descendant scope.
+ *
+ * The name we coin is going to be inserted in `insertScope` and referenced from inside child scopes
+ * (the `useEffect` callback). So a clash anywhere on that path would either fail to compile
+ * (same-scope redeclare) or cause a rewritten reference to bind to the wrong variable (outer-scope
+ * shadow, or inner-scope shadow inside the callback).
+ *
+ * Returns `base` when it's free, otherwise appends `_1`, `_2`, … until a free name is found.
+ */
+export function findAvailableBindingName(base: string, insertScope: Scope): string {
+  const taken = collectConflictingNames(insertScope);
+  if (!taken.has(base)) return base;
+  let n = 1;
+  while (taken.has(`${base}_${n}`)) n++;
+  return `${base}_${n}`;
+}
+
+function collectConflictingNames(insertScope: Scope): Set<string> {
+  const names = new Set<string>();
+  // Walk up: anything visible from `insertScope` either prevents the declaration (same scope)
+  // or would be shadowed by it (outer scope, breaking existing references inside the callback).
+  for (let s: Scope | null = insertScope; s !== null; s = s.upper) {
+    for (const name of s.set.keys()) names.add(name);
+  }
+  // Walk down: a binding with the same name in any descendant scope would shadow the new
+  // declaration when we rewrite call sites inside the callback.
+  const stack: Scope[] = [...insertScope.childScopes];
+  for (let scope = stack.pop(); scope !== undefined; scope = stack.pop()) {
+    for (const name of scope.set.keys()) names.add(name);
+    stack.push(...scope.childScopes);
+  }
+  return names;
 }
