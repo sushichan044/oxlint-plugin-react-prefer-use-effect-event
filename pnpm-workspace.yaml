@@ -1,7 +1,7 @@
 packages:
   - "e2e/*"
 allowBuilds:
-  unrs-resolver: set this to true or false
+  unrs-resolver: true
 catalogs:
   dev:
     '@arethetypeswrong/core': 0.18.2
