@@ -1,6 +1,6 @@
 # oxlint-plugin-react-prefer-use-effect-event
 
-An [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) / [ESLint](https://eslint.org/) plugin that enforces wrapping handler calls inside `useEffect` with [`useEffectEvent`](https://react.dev/reference/react/experimental_useEffectEvent).
+An [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) / [ESLint](https://eslint.org/) plugin that suggests wrapping calls to event handlers of your choice inside `useEffect` with [`useEffectEvent`](https://react.dev/reference/react/experimental_useEffectEvent).
 
 ## What it does
 
@@ -16,7 +16,11 @@ See [extracting non-reactive logic out of the effect - react.dev](https://react.
       {
         "targets": [
           {
-            "source": { "from": "package", "package": "some-notification-library", "name": "notify" },
+            "source": {
+              "from": "package",
+              "package": "some-notification-library",
+              "name": "notify"
+            },
             "handler": { "kind": "value" }
           }
         ]
@@ -76,7 +80,11 @@ Add the plugin to your `.oxlintrc.json`:
       {
         "targets": [
           {
-            "source": { "from": "package", "package": "some-notification-library", "name": "notify" },
+            "source": {
+              "from": "package",
+              "package": "some-notification-library",
+              "name": "notify"
+            },
             "handler": { "kind": "value" }
           }
         ]
