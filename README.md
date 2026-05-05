@@ -37,14 +37,14 @@ Add the plugin to your `.oxlintrc.json`:
 
 ```ts
 import { defineConfig } from "eslint/config";
-import plugin from "oxlint-plugin-react-prefer-use-effect-event";
+import useEffectEvent from "oxlint-plugin-react-prefer-use-effect-event";
 
 export default defineConfig({
   plugins: {
-    "oxlint-plugin-react-prefer-use-effect-event": plugin,
+    "react-prefer-use-effect-event": useEffectEvent,
   },
   rules: {
-    "oxlint-plugin-react-prefer-use-effect-event/prefer-use-effect-event": [
+    "react-prefer-use-effect-event/prefer-use-effect-event": [
       "error",
       {
         targets: [
