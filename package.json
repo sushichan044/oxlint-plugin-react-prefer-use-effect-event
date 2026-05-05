@@ -61,6 +61,7 @@
   "dependencies": {
     "@oxlint/plugins": "catalog:prod",
     "empathic": "catalog:prod",
+    "oxc-parser": "catalog:prod",
     "unrs-resolver": "catalog:prod"
   },
   "devDependencies": {
@@ -71,7 +72,6 @@
     "eslint": "catalog:dev",
     "eslint-doc-generator": "catalog:dev",
     "fs-fixture": "^2.13.0",
-    "oxc-parser": "catalog:dev",
     "oxfmt": "catalog:dev",
     "oxlint": "catalog:dev",
     "oxlint-tsgolint": "catalog:dev",

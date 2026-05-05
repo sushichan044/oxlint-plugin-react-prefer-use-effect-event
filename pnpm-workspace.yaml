@@ -11,7 +11,6 @@ catalogs:
     '@virtual-live-lab/tsconfig': 2.1.21
     eslint: 9.39.2
     eslint-doc-generator: 3.3.2
-    oxc-parser: 0.128.0
     oxfmt: 0.47.0
     oxlint: 1.62.0
     oxlint-tsgolint: 0.22.1
@@ -29,4 +28,5 @@ catalogs:
   prod:
     '@oxlint/plugins': 1.62.0
     empathic: 2.0.0
+    oxc-parser: 0.128.0
     unrs-resolver: 1.11.1

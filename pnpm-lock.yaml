@@ -24,9 +24,6 @@ catalogs:
     eslint-doc-generator:
       specifier: 3.3.2
       version: 3.3.2
-    oxc-parser:
-      specifier: 0.128.0
-      version: 0.128.0
     oxfmt:
       specifier: 0.47.0
       version: 0.47.0
@@ -74,6 +71,9 @@ catalogs:
     empathic:
       specifier: 2.0.0
       version: 2.0.0
+    oxc-parser:
+      specifier: 0.128.0
+      version: 0.128.0
     unrs-resolver:
       specifier: 1.11.1
       version: 1.11.1
@@ -88,6 +88,9 @@ importers:
       empathic:
         specifier: catalog:prod
         version: 2.0.0
+      oxc-parser:
+        specifier: catalog:prod
+        version: 0.128.0
       unrs-resolver:
         specifier: catalog:prod
         version: 1.11.1
@@ -113,9 +116,6 @@ importers:
       fs-fixture:
         specifier: ^2.13.0
         version: 2.13.0
-      oxc-parser:
-        specifier: catalog:dev
-        version: 0.128.0
       oxfmt:
         specifier: catalog:dev
         version: 0.47.0
