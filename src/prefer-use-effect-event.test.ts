@@ -633,6 +633,146 @@ const Component = () => {
     });
   });
 
+  describe("default import handler (name: 'default')", () => {
+    const defaultValueOptions = [
+      {
+        targets: [
+          {
+            source: { from: "package", package: "axios", name: "default" },
+            handler: { kind: "value" },
+          },
+        ],
+      },
+    ] satisfies Options;
+
+    const defaultCallReturnOptions = [
+      {
+        targets: [
+          {
+            source: { from: "package", package: "create-client", name: "default" },
+            handler: { kind: "call-return" },
+          },
+        ],
+      },
+    ] satisfies Options;
+
+    it("rewrites a useEffect that depends on a default-imported value handler", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import axios from "axios";
+
+const Component = () => {
+  useEffect(() => {
+    axios();
+  }, [axios]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "axios" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import axios from "axios";
+
+const Component = () => {
+  const axiosEvent = useEffectEvent(axios);
+  useEffect(() => {
+    axiosEvent();
+  }, []);
+};`,
+              options: defaultValueOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("works when the default import is locally renamed", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import http from "axios";
+
+const Component = () => {
+  useEffect(() => {
+    http();
+  }, [http]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "http" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import http from "axios";
+
+const Component = () => {
+  const httpEvent = useEffectEvent(http);
+  useEffect(() => {
+    httpEvent();
+  }, []);
+};`,
+              options: defaultValueOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a useEffect that depends on the return value of a default-imported call-return handler", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import createClient from "create-client";
+
+const Component = () => {
+  const client = createClient();
+  useEffect(() => {
+    client();
+  }, [client]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "client" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import createClient from "create-client";
+
+const Component = () => {
+  const client = createClient();
+  const clientEvent = useEffectEvent(client);
+  useEffect(() => {
+    clientEvent();
+  }, []);
+};`,
+              options: defaultCallReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag a default import from a different package", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import axios from "other-pkg";
+
+const Component = () => {
+  useEffect(() => {
+    axios();
+  }, [axios]);
+};`,
+              options: defaultValueOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
   // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
   // the dedicated resolver unit tests and the e2e fixture rigs.

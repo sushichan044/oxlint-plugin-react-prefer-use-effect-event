@@ -10,10 +10,12 @@
 type FileSource = {
   from: "file";
   /**
-   * The name of the export that is the handler.
+   * The name of the export that is the handler. Use `"default"` to match the module's default
+   * export (`import handler from "..."`).
    *
    * @example
    *   "navigate";
+   *   "default";
    */
   name: string;
   /**
@@ -32,10 +34,12 @@ type FileSource = {
 type PackageSource = {
   from: "package";
   /**
-   * The name of the export that is the handler.
+   * The name of the export that is the handler. Use `"default"` to match the module's default
+   * export (`import handler from "pkg"`).
    *
    * @example
    *   "useNavigate";
+   *   "default";
    */
   name: string;
   /**
@@ -46,7 +50,6 @@ type PackageSource = {
    */
   package: string;
 };
-
 type Source = FileSource | PackageSource;
 
 /**

@@ -139,7 +139,8 @@ const preferUseEffectEvent = defineRule({
                         },
                         name: {
                           type: "string",
-                          description: "Named export to track on the package.",
+                          description:
+                            'Named export to track on the package. Use `"default"` to match the default export (`import handler from "pkg"`).',
                         },
                       },
                     },
@@ -159,7 +160,8 @@ const preferUseEffectEvent = defineRule({
                         },
                         name: {
                           type: "string",
-                          description: "Named export to track on the file.",
+                          description:
+                            'Named export to track on the file. Use `"default"` to match the default export (`import handler from "…"`).',
                         },
                       },
                     },
@@ -323,7 +325,8 @@ const preferUseEffectEvent = defineRule({
           }
 
           // Tracked-import handling (any package, not just React).
-          if (specifier.type !== "ImportSpecifier") continue;
+          if (specifier.type !== "ImportSpecifier" && specifier.type !== "ImportDefaultSpecifier")
+            continue;
           const target = matchModuleTarget(specifier, node.source.value, fileTargets, {
             configDir: ensureConfigDir(),
             getResolvedImport,

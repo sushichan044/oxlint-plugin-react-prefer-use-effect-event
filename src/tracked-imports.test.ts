@@ -20,6 +20,12 @@ function firstSpecifier(decl: ESTree.ImportDeclaration): ESTree.ImportSpecifier 
   return spec;
 }
 
+function firstDefaultSpecifier(decl: ESTree.ImportDeclaration): ESTree.ImportDefaultSpecifier {
+  const spec = decl.specifiers[0];
+  assert(spec && spec.type === "ImportDefaultSpecifier");
+  return spec;
+}
+
 const useNavigateTarget: TargetSpec = {
   source: { from: "package", package: "react-router", name: "useNavigate" },
   handler: { kind: "call-return" },
@@ -159,5 +165,62 @@ describe("matchModuleTarget", () => {
     expect(
       matchModuleTarget(firstSpecifier(decl), decl.source.value, [fileTarget], ctx),
     ).toBeNull();
+  });
+
+  describe("default import (name: 'default')", () => {
+    const defaultTarget: TargetSpec = {
+      source: { from: "package", package: "axios", name: "default" },
+      handler: { kind: "value" },
+    };
+
+    it("matches a default import against a target with name 'default'", () => {
+      const decl = firstImport(`import axios from "axios";`);
+      const result = matchModuleTarget(
+        firstDefaultSpecifier(decl),
+        decl.source.value,
+        [defaultTarget],
+        noFileCtx,
+      );
+
+      expect(result).toBe(defaultTarget);
+    });
+
+    it("returns null when the package does not match for a default import", () => {
+      const decl = firstImport(`import axios from "other-pkg";`);
+      const result = matchModuleTarget(
+        firstDefaultSpecifier(decl),
+        decl.source.value,
+        [defaultTarget],
+        noFileCtx,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("does not match a named import against a target with name 'default'", () => {
+      const decl = firstImport(`import { get } from "axios";`);
+      const result = matchModuleTarget(
+        firstSpecifier(decl),
+        decl.source.value,
+        [defaultTarget],
+        noFileCtx,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("matches a file-source default import target when the resolved path equals the configured path", () => {
+      const configDir = "/proj";
+      const fileDefaultTarget: TargetSpec = {
+        source: { from: "file", path: "src/api/client.ts", name: "default" },
+        handler: { kind: "value" },
+      };
+      const decl = firstImport(`import client from "@/api/client";`);
+      const ctx = staticCtx(configDir, path.join(configDir, "src/api/client.ts"));
+
+      expect(
+        matchModuleTarget(firstDefaultSpecifier(decl), decl.source.value, [fileDefaultTarget], ctx),
+      ).toBe(fileDefaultTarget);
+    });
   });
 });

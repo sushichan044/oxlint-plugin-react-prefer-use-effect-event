@@ -32,15 +32,19 @@ export type MatchContext = {
  *
  * Matching uses the _original_ exported name (`specifier.imported`), so renamed imports such as
  * `import { useNavigate as useNav } from "react-router"` still match a target configured with
- * `name: "useNavigate"`.
+ * `name: "useNavigate"`. For default imports (`import foo from "pkg"`), the exported name is
+ * treated as `"default"` and matches targets configured with `name: "default"`.
  */
 export function matchModuleTarget(
-  specifier: ESTree.ImportSpecifier,
+  specifier: ESTree.ImportSpecifier | ESTree.ImportDefaultSpecifier,
   importSource: string,
   targets: readonly TargetSpec[],
   ctx: MatchContext,
 ): TargetSpec | null {
-  const importedName = getModuleExportName(specifier.imported);
+  const importedName =
+    specifier.type === "ImportDefaultSpecifier"
+      ? "default"
+      : getModuleExportName(specifier.imported);
   for (const target of targets) {
     if (target.source.name !== importedName) continue;
     if (target.source.from === "package") {
