@@ -8,6 +8,7 @@ import { Resolver } from "./resolver";
 import { ScopeIndex } from "./scope-utils";
 import { matchModuleTarget } from "./tracked-imports";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
+import { getRuleDocsURL } from "./utils";
 
 type TargetOption = {
   targets: TargetSpec[];
@@ -95,6 +96,7 @@ const preferUseEffectEvent = defineRule({
     docs: {
       description:
         "Wrap event handlers passed into `useEffect` with `useEffectEvent` to avoid stale closures and unnecessary effect re-runs.",
+      url: getRuleDocsURL("prefer-use-effect-event"),
     },
     messages: {
       preferUseEffectEvent: "Wrap the call of {{handlerName}} with useEffectEvent.",
