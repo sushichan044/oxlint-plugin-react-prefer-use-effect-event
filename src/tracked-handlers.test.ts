@@ -2,7 +2,7 @@ import type { ESTree } from "@oxlint/plugins";
 import { assert, describe, expect, it } from "vitest";
 import type { TargetSpec } from "./types";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
-import { pasrseAsOxlint } from "./utils";
+import { parseAsOxlint } from "./utils";
 
 const callReturnTarget: TargetSpec = {
   source: { from: "package", package: "pkg", name: "useNotify" },
@@ -20,7 +20,7 @@ const directTarget: TargetSpec = {
 };
 
 function firstDeclarator(code: string): ESTree.VariableDeclarator {
-  const program = pasrseAsOxlint("test.tsx", code);
+  const program = parseAsOxlint("test.tsx", code);
   const stmt = program.body[0];
   assert(stmt && stmt.type === "VariableDeclaration");
   const declarator = stmt.declarations[0];
@@ -109,7 +109,7 @@ describe("extractHandlersFromDeclarator", () => {
         `const key = "notify"; const { [key]: notify } = useNotify();`,
       );
       // grab the second declarator
-      const program = pasrseAsOxlint("test.tsx", `const { [key]: notify } = useNotify();`);
+      const program = parseAsOxlint("test.tsx", `const { [key]: notify } = useNotify();`);
       const stmt = program.body[0];
       assert(stmt && stmt.type === "VariableDeclaration");
       const computedDeclarator = stmt.declarations[0];

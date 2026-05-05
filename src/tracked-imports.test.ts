@@ -5,10 +5,10 @@ import { assert, describe, expect, it } from "vitest";
 import type { MatchContext } from "./tracked-imports";
 import type { TargetSpec } from "./types";
 import { matchModuleTarget } from "./tracked-imports";
-import { pasrseAsOxlint } from "./utils";
+import { parseAsOxlint } from "./utils";
 
 function firstImport(code: string): ESTree.ImportDeclaration {
-  const program = pasrseAsOxlint("test.tsx", code);
+  const program = parseAsOxlint("test.tsx", code);
   const stmt = program.body[0];
   assert(stmt && stmt.type === "ImportDeclaration");
   return stmt as unknown as ESTree.ImportDeclaration;

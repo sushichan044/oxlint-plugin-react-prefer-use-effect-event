@@ -8,7 +8,6 @@ import { Resolver } from "./resolver";
 import { ScopeIndex } from "./scope-utils";
 import { matchModuleTarget } from "./tracked-imports";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
-import { spanRange } from "./utils";
 
 type TargetOption = {
   targets: TargetSpec[];
@@ -417,7 +416,7 @@ const preferUseEffectEvent = defineRule({
                 // add a named one — the fix uses `<ns>.useEffectEvent` instead.
                 if (lastNamed) {
                   fixes.push(
-                    fixer.insertTextAfterRange(spanRange(lastNamed), `, ${capturedExportName}`),
+                    fixer.insertTextAfterRange(lastNamed.range, `, ${capturedExportName}`),
                   );
                 }
               }
@@ -428,7 +427,7 @@ const preferUseEffectEvent = defineRule({
               const indent = src.slice(lineStart, nodeStart);
               fixes.push(
                 fixer.insertTextBeforeRange(
-                  spanRange(node),
+                  node.range,
                   `const ${eventName} = ${eventCalleeText}(${handlerName});\n${indent}`,
                 ),
               );
@@ -439,7 +438,7 @@ const preferUseEffectEvent = defineRule({
                 const { body } = callbackArg;
                 if (body.type === "BlockStatement") {
                   for (const call of collectCallSitesOfVariable(variable, body)) {
-                    fixes.push(fixer.replaceTextRange(spanRange(call.callee), eventName));
+                    fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
                   }
                 }
               }
@@ -453,7 +452,7 @@ const preferUseEffectEvent = defineRule({
                 if (eStart === elementStart) continue;
                 remaining.push(src.slice(eStart, eEnd));
               }
-              fixes.push(fixer.replaceTextRange(spanRange(depsArg), `[${remaining.join(", ")}]`));
+              fixes.push(fixer.replaceTextRange(depsArg.range, `[${remaining.join(", ")}]`));
 
               return fixes;
             },

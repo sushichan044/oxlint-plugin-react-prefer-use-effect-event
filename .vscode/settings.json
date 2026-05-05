@@ -10,5 +10,6 @@
   },
   "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.formatOnSave": true,
-  "js/ts.experimental.useTsgo": true
+  "js/ts.experimental.useTsgo": true,
+  "cSpell.words": ["oxlint"]
 }
