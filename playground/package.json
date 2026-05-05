@@ -1,0 +1,13 @@
+{
+  "name": "playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "oxlint --config .oxlintrc.json src/",
+    "fix": "oxlint --fix --config .oxlintrc.json src/"
+  },
+  "devDependencies": {
+    "oxlint": "catalog:dev",
+    "oxlint-plugin-react-prefer-use-effect-event": "workspace:*"
+  }
+}

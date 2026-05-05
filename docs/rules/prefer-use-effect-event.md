@@ -21,7 +21,7 @@ import { notify } from "some-notification-library";
 export function RedirectOnAuth({ user }) {
   useEffect(() => {
     if (!user) {
-      notify("User is not authenticated");
+      notify("User is not authenticated"); // This will cause the effect to re-run whenever `notify` changes, even though the notification logic itself doesn't depend on `user`.
       return;
     }
     // other logic that depends on user
@@ -36,13 +36,11 @@ import { useEffect, useEffectEvent } from "react";
 import { notify } from "some-notification-library";
 
 export function RedirectOnAuth({ user }) {
-  const notifyUserNotAuthenticated = useEffectEvent(() => {
-    notify("User is not authenticated");
-  });
+  const notifyEvent = useEffectEvent(notify);
 
   useEffect(() => {
     if (!user) {
-      notifyUserNotAuthenticated();
+      notifyEvent("User is not authenticated"); // No need to include notifyEvent in the dependency array, so this effect won't re-run when notify changes.
       return;
     }
     // other logic that depends on user
@@ -59,10 +57,10 @@ Specifies which bindings should be considered "handlers" that must be wrapped. E
 - `source` — where the handler comes from
   - `{ from: "package", package: "<npm package>", name: "<export name>" }` — match a named export from an npm package
   - `{ from: "file", path: "<relative path>", name: "<export name>" }` — match a named export from a project-local file
-- `derivation` — how the handler is obtained from the source
-  - `{ kind: "direct" }` — the import itself is the handler (e.g. `import { handler } from "..."`)
+- `handler` — how the handler is obtained from the source
+  - `{ kind: "value" }` — the import itself is the handler (e.g. `import { handler } from "..."`)
   - `{ kind: "call-return" }` — the handler is the return value of calling the import (e.g. `const navigate = useNavigate()`)
-  - `{ kind: "call-return-properties", properties: ["<prop>", ...] }` — the handler is a property of the call's return value (e.g. `const { mutate } = useMutation()`)
+  - `{ kind: "call-return-property", properties: ["<prop>", ...] }` — the handler is a property of the call's return value (e.g. `const { mutate } = useMutation()`)
 
 ### `experimentalUseEffectEvent`
 

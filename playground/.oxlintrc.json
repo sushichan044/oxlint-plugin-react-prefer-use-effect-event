@@ -1,15 +1,4 @@
 {
-  "$schema": "../../node_modules/oxlint/configuration_schema.json",
-  "plugins": [],
-  "categories": {
-    "correctness": "off",
-    "nursery": "off",
-    "perf": "off",
-    "style": "off",
-    "restriction": "off",
-    "suspicious": "off",
-    "pedantic": "off"
-  },
   "jsPlugins": ["oxlint-plugin-react-prefer-use-effect-event"],
   "rules": {
     "oxlint-plugin-react-prefer-use-effect-event/prefer-use-effect-event": [
@@ -17,12 +6,20 @@
       {
         "targets": [
           {
+            "source": {
+              "from": "package",
+              "package": "some-notification-library",
+              "name": "notify"
+            },
+            "handler": { "kind": "value" }
+          },
+          {
             "source": { "from": "package", "package": "react-router", "name": "useNavigate" },
             "handler": { "kind": "call-return" }
           },
           {
-            "source": { "from": "file", "path": "hooks/useToast.ts", "name": "useToast" },
-            "handler": { "kind": "call-return" }
+            "source": { "from": "package", "package": "@example/hooks", "name": "useMutation" },
+            "handler": { "kind": "call-return-property", "properties": ["mutate"] }
           }
         ]
       }

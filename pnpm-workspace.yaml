@@ -1,5 +1,6 @@
 packages:
   - "e2e/*"
+  - "playground"
 allowBuilds:
   unrs-resolver: true
 catalogs:

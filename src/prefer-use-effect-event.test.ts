@@ -19,29 +19,29 @@ const callReturnOptions = [
     targets: [
       {
         source: { from: "package", package: "react-router", name: "useNavigate" },
-        derivation: { kind: "call-return" },
+        handler: { kind: "call-return" },
       },
     ],
   },
 ] satisfies Options;
 
-const directOptions = [
+const valueOptions = [
   {
     targets: [
       {
         source: { from: "package", package: "pkg", name: "notify" },
-        derivation: { kind: "direct" },
+        handler: { kind: "value" },
       },
     ],
   },
 ] satisfies Options;
 
-const callReturnPropertiesOptions = [
+const callReturnPropertyOptions = [
   {
     targets: [
       {
         source: { from: "package", package: "pkg", name: "useNotify" },
-        derivation: { kind: "call-return-properties", properties: ["notify"] },
+        handler: { kind: "call-return-property", properties: ["notify"] },
       },
     ],
   },
@@ -52,7 +52,7 @@ function runRule(testCases: Parameters<typeof ruleTester.run>[2]): void {
 }
 
 describe("prefer-use-effect-event", () => {
-  describe("call-return derivation", () => {
+  describe("call-return handler", () => {
     it("rewrites a useEffect that depends on a hook return value", () => {
       expect(() => {
         runRule({
@@ -143,7 +143,7 @@ const Component = () => {
       }).not.toThrow();
     });
 
-    it("ignores call-return when the binding is destructured", () => {
+    it("ignores call-return handler when the binding is destructured", () => {
       expect(() => {
         runRule({
           valid: [
@@ -166,7 +166,7 @@ const Component = () => {
     });
   });
 
-  describe("direct derivation", () => {
+  describe("value handler", () => {
     it("rewrites a useEffect that depends on a directly imported handler", () => {
       expect(() => {
         runRule({
@@ -191,7 +191,7 @@ const Component = () => {
     notifyEvent();
   }, []);
 };`,
-              options: directOptions,
+              options: valueOptions,
             },
           ],
         });
@@ -222,7 +222,7 @@ const Component = () => {
     alertEvent();
   }, []);
 };`,
-              options: directOptions,
+              options: valueOptions,
             },
           ],
         });
@@ -243,7 +243,7 @@ const Component = () => {
     notify();
   }, [notify]);
 };`,
-              options: directOptions,
+              options: valueOptions,
             },
           ],
           invalid: [],
@@ -252,7 +252,7 @@ const Component = () => {
     });
   });
 
-  describe("call-return-properties derivation", () => {
+  describe("call-return-property handler", () => {
     it("rewrites a useEffect that depends on a destructured property", () => {
       expect(() => {
         runRule({
@@ -279,7 +279,7 @@ const Component = () => {
     notifyEvent();
   }, []);
 };`,
-              options: callReturnPropertiesOptions,
+              options: callReturnPropertyOptions,
             },
           ],
         });
@@ -312,7 +312,7 @@ const Component = () => {
     sendEvent();
   }, []);
 };`,
-              options: callReturnPropertiesOptions,
+              options: callReturnPropertyOptions,
             },
           ],
         });
@@ -333,7 +333,7 @@ const Component = () => {
     warn();
   }, [warn]);
 };`,
-              options: callReturnPropertiesOptions,
+              options: callReturnPropertyOptions,
             },
           ],
           invalid: [],

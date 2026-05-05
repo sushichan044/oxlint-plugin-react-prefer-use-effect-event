@@ -20,10 +20,10 @@ export type ResolveCalleeTarget = (callee: ESTree.IdentifierReference) => Target
  * where `source(...)` resolves to a tracked import via `resolveCalleeTarget`.
  *
  * Returns an empty array when the declarator does not match either shape, when its initializer is
- * not a call to a tracked import, or when the derivation kind disallows the shape.
+ * not a call to a tracked import, or when the handler kind disallows the shape.
  *
- * `direct` derivations are NOT processed here — for those the import binding itself is the handler,
- * not anything declared via `=`.
+ * `value` handlers are NOT processed here — for those the import binding itself is the handler, not
+ * anything declared via `=`.
  */
 export function extractHandlersFromDeclarator(
   declarator: ESTree.VariableDeclarator,
@@ -36,8 +36,8 @@ export function extractHandlersFromDeclarator(
   const target = resolveCalleeTarget(callee);
   if (!target) return [];
 
-  switch (target.derivation.kind) {
-    case "direct":
+  switch (target.handler.kind) {
+    case "value":
       return [];
 
     case "call-return": {
@@ -45,9 +45,9 @@ export function extractHandlersFromDeclarator(
       return [{ binding: declarator.id, target }];
     }
 
-    case "call-return-properties": {
+    case "call-return-property": {
       if (declarator.id.type !== "ObjectPattern") return [];
-      return collectMatchingProperties(declarator.id, target.derivation.properties, target);
+      return collectMatchingProperties(declarator.id, target.handler.properties, target);
     }
   }
 }

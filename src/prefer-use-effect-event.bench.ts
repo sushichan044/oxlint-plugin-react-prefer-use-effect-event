@@ -22,7 +22,7 @@ const callReturnOptions = [
     targets: [
       {
         source: { from: "package", package: "react-router", name: "useNavigate" },
-        derivation: { kind: "call-return" },
+        handler: { kind: "call-return" },
       },
     ],
   },

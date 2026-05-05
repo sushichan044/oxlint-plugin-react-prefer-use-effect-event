@@ -50,7 +50,7 @@ type PackageSource = {
 type Source = FileSource | PackageSource;
 
 /**
- * Declares a handler is direct value of the source.
+ * The source value itself is the handler.
  *
  * ```ts
  * import { useEffect, useEffectEvent } from "react";
@@ -65,14 +65,14 @@ type Source = FileSource | PackageSource;
  * ```
  *
  * @example
- *   { kind: "direct" }
+ *   { kind: "value" }
  */
-type DirectValueDerivation = {
-  kind: "direct";
+type HandlerValue = {
+  kind: "value";
 };
 
 /**
- * Declares a handler is the return value of the call expression of the source.
+ * The handler is the return value of calling the source.
  *
  * ```ts
  * import { useEffect, useEffectEvent } from "react";
@@ -90,12 +90,12 @@ type DirectValueDerivation = {
  * @example
  *   { kind: "call-return" }
  */
-type CallReturnDerivation = {
+type HandlerCallReturn = {
   kind: "call-return";
 };
 
 /**
- * Declares a handler is the property of the return value of the call expression of the source.
+ * The handler is a property of the return value of calling the source.
  *
  * The property name is specified in `properties`.
  *
@@ -113,16 +113,16 @@ type CallReturnDerivation = {
  * ```
  *
  * @example
- *   { kind: "call-return-properties", properties: ["notify"] }
+ *   { kind: "call-return-property", properties: ["notify"] }
  */
-type CallReturnPropertiesDerivation = {
-  kind: "call-return-properties";
+type HandlerCallReturnProperty = {
+  kind: "call-return-property";
   properties: string[];
 };
 
-type Derivation = DirectValueDerivation | CallReturnDerivation | CallReturnPropertiesDerivation;
+type Handler = HandlerValue | HandlerCallReturn | HandlerCallReturnProperty;
 
 export type TargetSpec = {
   source: Source;
-  derivation: Derivation;
+  handler: Handler;
 };

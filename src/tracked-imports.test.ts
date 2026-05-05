@@ -22,7 +22,7 @@ function firstSpecifier(decl: ESTree.ImportDeclaration): ESTree.ImportSpecifier 
 
 const useNavigateTarget: TargetSpec = {
   source: { from: "package", package: "react-router", name: "useNavigate" },
-  derivation: { kind: "call-return" },
+  handler: { kind: "call-return" },
 };
 
 /** Match context with no resolver — used for tests that only exercise package-source targets. */
@@ -89,26 +89,26 @@ describe("matchModuleTarget", () => {
   });
 
   it("returns the first matching target when several apply", () => {
-    const directTarget: TargetSpec = {
+    const valueTarget: TargetSpec = {
       source: { from: "package", package: "react-router", name: "useNavigate" },
-      derivation: { kind: "direct" },
+      handler: { kind: "value" },
     };
     const decl = firstImport(`import { useNavigate } from "react-router";`);
     const result = matchModuleTarget(
       firstSpecifier(decl),
       decl.source.value,
-      [directTarget, useNavigateTarget],
+      [valueTarget, useNavigateTarget],
       noFileCtx,
     );
 
-    expect(result).toBe(directTarget);
+    expect(result).toBe(valueTarget);
   });
 
   it("matches a file-source target when the resolved path equals the configured path", () => {
     const configDir = "/proj";
     const fileTarget: TargetSpec = {
       source: { from: "file", path: "src/hooks/useToast.ts", name: "useToast" },
-      derivation: { kind: "call-return" },
+      handler: { kind: "call-return" },
     };
     const decl = firstImport(`import { useToast } from "@/hooks/useToast";`);
     const ctx = staticCtx(configDir, path.join(configDir, "src/hooks/useToast.ts"));
@@ -122,7 +122,7 @@ describe("matchModuleTarget", () => {
     const configDir = "/proj";
     const fileTarget: TargetSpec = {
       source: { from: "file", path: "src/hooks/useToast.ts", name: "useToast" },
-      derivation: { kind: "call-return" },
+      handler: { kind: "call-return" },
     };
     const decl = firstImport(`import { useToast } from "@/hooks/somewhere-else";`);
     const ctx = staticCtx(configDir, path.join(configDir, "src/hooks/somewhere-else.ts"));
@@ -135,7 +135,7 @@ describe("matchModuleTarget", () => {
   it("returns null for a file-source target when the import cannot be resolved", () => {
     const fileTarget: TargetSpec = {
       source: { from: "file", path: "src/hooks/useToast.ts", name: "useToast" },
-      derivation: { kind: "call-return" },
+      handler: { kind: "call-return" },
     };
     const decl = firstImport(`import { useToast } from "@/hooks/useToast";`);
     const ctx = staticCtx("/proj", null);
@@ -148,7 +148,7 @@ describe("matchModuleTarget", () => {
   it("returns null for a file-source target when no oxlint config dir was found", () => {
     const fileTarget: TargetSpec = {
       source: { from: "file", path: "src/hooks/useToast.ts", name: "useToast" },
-      derivation: { kind: "call-return" },
+      handler: { kind: "call-return" },
     };
     const decl = firstImport(`import { useToast } from "@/hooks/useToast";`);
     const ctx: MatchContext = {

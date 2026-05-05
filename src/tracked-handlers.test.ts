@@ -6,17 +6,17 @@ import { parseAsOxlint } from "./utils";
 
 const callReturnTarget: TargetSpec = {
   source: { from: "package", package: "pkg", name: "useNotify" },
-  derivation: { kind: "call-return" },
+  handler: { kind: "call-return" },
 };
 
-const callReturnPropertiesTarget: TargetSpec = {
+const callReturnPropertyTarget: TargetSpec = {
   source: { from: "package", package: "pkg", name: "useNotify" },
-  derivation: { kind: "call-return-properties", properties: ["notify", "warn"] },
+  handler: { kind: "call-return-property", properties: ["notify", "warn"] },
 };
 
-const directTarget: TargetSpec = {
+const valueTarget: TargetSpec = {
   source: { from: "package", package: "pkg", name: "notify" },
-  derivation: { kind: "direct" },
+  handler: { kind: "value" },
 };
 
 function firstDeclarator(code: string): ESTree.VariableDeclarator {
@@ -55,7 +55,7 @@ describe("extractHandlersFromDeclarator", () => {
     expect(result).toEqual([]);
   });
 
-  describe("call-return derivation", () => {
+  describe("call-return handler", () => {
     it("returns the LHS identifier as a handler", () => {
       const declarator = firstDeclarator(`const notify = useNotify();`);
       const result = extractHandlersFromDeclarator(
@@ -80,12 +80,12 @@ describe("extractHandlersFromDeclarator", () => {
     });
   });
 
-  describe("call-return-properties derivation", () => {
+  describe("call-return-property handler", () => {
     it("returns properties listed in the target spec", () => {
       const declarator = firstDeclarator(`const { notify, warn, info } = useNotify();`);
       const result = extractHandlersFromDeclarator(
         declarator,
-        namedResolver("useNotify", callReturnPropertiesTarget),
+        namedResolver("useNotify", callReturnPropertyTarget),
       );
 
       const names = result.map((handler) => handler.binding.name).sort();
@@ -96,7 +96,7 @@ describe("extractHandlersFromDeclarator", () => {
       const declarator = firstDeclarator(`const { notify: doNotify } = useNotify();`);
       const result = extractHandlersFromDeclarator(
         declarator,
-        namedResolver("useNotify", callReturnPropertiesTarget),
+        namedResolver("useNotify", callReturnPropertyTarget),
       );
 
       expect(result).toHaveLength(1);
@@ -117,7 +117,7 @@ describe("extractHandlersFromDeclarator", () => {
 
       const result = extractHandlersFromDeclarator(
         computedDeclarator as unknown as ESTree.VariableDeclarator,
-        namedResolver("useNotify", callReturnPropertiesTarget),
+        namedResolver("useNotify", callReturnPropertyTarget),
       );
 
       expect(result).toEqual([]);
@@ -129,7 +129,7 @@ describe("extractHandlersFromDeclarator", () => {
       const declarator = firstDeclarator(`const { notify: { x } } = useNotify();`);
       const result = extractHandlersFromDeclarator(
         declarator,
-        namedResolver("useNotify", callReturnPropertiesTarget),
+        namedResolver("useNotify", callReturnPropertyTarget),
       );
 
       expect(result).toEqual([]);
@@ -139,19 +139,19 @@ describe("extractHandlersFromDeclarator", () => {
       const declarator = firstDeclarator(`const handlers = useNotify();`);
       const result = extractHandlersFromDeclarator(
         declarator,
-        namedResolver("useNotify", callReturnPropertiesTarget),
+        namedResolver("useNotify", callReturnPropertyTarget),
       );
 
       expect(result).toEqual([]);
     });
   });
 
-  describe("direct derivation", () => {
+  describe("value handler", () => {
     it("never produces handlers from declarators (handled at the import level instead)", () => {
       const declarator = firstDeclarator(`const x = notify();`);
       const result = extractHandlersFromDeclarator(
         declarator,
-        namedResolver("notify", directTarget),
+        namedResolver("notify", valueTarget),
       );
 
       expect(result).toEqual([]);

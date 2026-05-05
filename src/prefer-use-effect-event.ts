@@ -117,7 +117,7 @@ const preferUseEffectEvent = defineRule({
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["source", "derivation"],
+              required: ["source", "handler"],
               properties: {
                 source: {
                   description: "Where the handler binding originates.",
@@ -163,7 +163,7 @@ const preferUseEffectEvent = defineRule({
                     },
                   ],
                 },
-                derivation: {
+                handler: {
                   description: "How the handler is obtained from `source`.",
                   oneOf: [
                     {
@@ -172,7 +172,7 @@ const preferUseEffectEvent = defineRule({
                       required: ["kind"],
                       properties: {
                         kind: {
-                          const: "direct",
+                          const: "value",
                           description: "The imported binding itself is the handler.",
                         },
                       },
@@ -195,9 +195,9 @@ const preferUseEffectEvent = defineRule({
                       required: ["kind", "properties"],
                       properties: {
                         kind: {
-                          const: "call-return-properties",
+                          const: "call-return-property",
                           description:
-                            "The handler is one or more properties of the value returned by calling the imported binding.",
+                            "The handler is a property of the value returned by calling the imported binding.",
                         },
                         properties: {
                           type: "array",
@@ -333,8 +333,8 @@ const preferUseEffectEvent = defineRule({
 
           trackedImports.set(variable, target);
 
-          // For `direct` derivations the imported binding *is* the handler.
-          if (target.derivation.kind === "direct") {
+          // For `value` handlers the imported binding *is* the handler.
+          if (target.handler.kind === "value") {
             trackedHandlers.set(variable, target);
           }
         }
