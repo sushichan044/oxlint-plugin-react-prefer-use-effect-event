@@ -5,7 +5,7 @@ import { defineRule } from "@oxlint/plugins";
 import { collectCallSitesOfVariable } from "./ast-utils";
 import { Resolver } from "./resolver";
 
-import { findAvailableBindingName, ScopeIndex } from "./scope-utils";
+import { isBindingNameAvailable, ScopeIndex } from "./scope-utils";
 import { matchModuleTarget } from "./tracked-imports";
 import { extractHandlersFromDeclarator } from "./tracked-handlers";
 import { getRuleDocsURL } from "./utils";
@@ -391,8 +391,12 @@ const preferUseEffectEvent = defineRule({
           if (!trackedHandlers.has(variable)) continue;
 
           const handlerName = element.name;
+          const eventName = `${handlerName}Event`;
           const insertScope = context.sourceCode.getScope(node);
-          const eventName = findAvailableBindingName(`${handlerName}Event`, insertScope);
+          // Drop the autofix entirely when the coined name would clash. Renaming to
+          // `${name}Event_1` etc. would force the user to read a generated suffix; reporting
+          // without a fix lets them pick a name that fits their codebase.
+          const canAutofix = isBindingNameAvailable(eventName, insertScope);
           const capturedReactImport = reactImport;
           const capturedExportName = useEffectEventExportName;
 
@@ -400,68 +404,70 @@ const preferUseEffectEvent = defineRule({
             node: element,
             messageId: "preferUseEffectEvent",
             data: { handlerName },
-            fix(fixer) {
-              const src = context.sourceCode.getText();
-              const fixes = [];
+            fix: canAutofix
+              ? (fixer) => {
+                  const src = context.sourceCode.getText();
+                  const fixes = [];
 
-              const eventCalleeText = resolveEventCalleeText(
-                capturedReactImport,
-                capturedExportName,
-              );
-
-              // 1. Add useEffectEvent to the named React imports if it isn't there yet.
-              if (
-                capturedReactImport !== null &&
-                capturedReactImport.useEffectEventLocalName === null
-              ) {
-                const namedSpecifiers = capturedReactImport.node.specifiers.filter(
-                  (s): s is ESTree.ImportSpecifier => s.type === "ImportSpecifier",
-                );
-                const lastNamed = namedSpecifiers[namedSpecifiers.length - 1];
-                // When the import has only a default/namespace specifier we don't need to
-                // add a named one — the fix uses `<ns>.useEffectEvent` instead.
-                if (lastNamed) {
-                  fixes.push(
-                    fixer.insertTextAfterRange(lastNamed.range, `, ${capturedExportName}`),
+                  const eventCalleeText = resolveEventCalleeText(
+                    capturedReactImport,
+                    capturedExportName,
                   );
-                }
-              }
 
-              // 2. Insert the wrapping declaration just before the useEffect call.
-              const [nodeStart] = node.range;
-              const lineStart = src.lastIndexOf("\n", nodeStart - 1) + 1;
-              const indent = src.slice(lineStart, nodeStart);
-              fixes.push(
-                fixer.insertTextBeforeRange(
-                  node.range,
-                  `const ${eventName} = ${eventCalleeText}(${handlerName});\n${indent}`,
-                ),
-              );
-
-              // 3. Replace handler call sites within the callback body.
-              const callbackArg = node.arguments[0];
-              if (callbackArg?.type === "ArrowFunctionExpression") {
-                const { body } = callbackArg;
-                if (body.type === "BlockStatement") {
-                  for (const call of collectCallSitesOfVariable(variable, body)) {
-                    fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
+                  // 1. Add useEffectEvent to the named React imports if it isn't there yet.
+                  if (
+                    capturedReactImport !== null &&
+                    capturedReactImport.useEffectEventLocalName === null
+                  ) {
+                    const namedSpecifiers = capturedReactImport.node.specifiers.filter(
+                      (s): s is ESTree.ImportSpecifier => s.type === "ImportSpecifier",
+                    );
+                    const lastNamed = namedSpecifiers[namedSpecifiers.length - 1];
+                    // When the import has only a default/namespace specifier we don't need to
+                    // add a named one — the fix uses `<ns>.useEffectEvent` instead.
+                    if (lastNamed) {
+                      fixes.push(
+                        fixer.insertTextAfterRange(lastNamed.range, `, ${capturedExportName}`),
+                      );
+                    }
                   }
+
+                  // 2. Insert the wrapping declaration just before the useEffect call.
+                  const [nodeStart] = node.range;
+                  const lineStart = src.lastIndexOf("\n", nodeStart - 1) + 1;
+                  const indent = src.slice(lineStart, nodeStart);
+                  fixes.push(
+                    fixer.insertTextBeforeRange(
+                      node.range,
+                      `const ${eventName} = ${eventCalleeText}(${handlerName});\n${indent}`,
+                    ),
+                  );
+
+                  // 3. Replace handler call sites within the callback body.
+                  const callbackArg = node.arguments[0];
+                  if (callbackArg?.type === "ArrowFunctionExpression") {
+                    const { body } = callbackArg;
+                    if (body.type === "BlockStatement") {
+                      for (const call of collectCallSitesOfVariable(variable, body)) {
+                        fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
+                      }
+                    }
+                  }
+
+                  // 4. Drop the handler from the dependency array.
+                  const remaining: string[] = [];
+                  const [elementStart] = element.range;
+                  for (const e of depsArg.elements) {
+                    if (!e) continue;
+                    const [eStart, eEnd] = e.range;
+                    if (eStart === elementStart) continue;
+                    remaining.push(src.slice(eStart, eEnd));
+                  }
+                  fixes.push(fixer.replaceTextRange(depsArg.range, `[${remaining.join(", ")}]`));
+
+                  return fixes;
                 }
-              }
-
-              // 4. Drop the handler from the dependency array.
-              const remaining: string[] = [];
-              const [elementStart] = element.range;
-              for (const e of depsArg.elements) {
-                if (!e) continue;
-                const [eStart, eEnd] = e.range;
-                if (eStart === elementStart) continue;
-                remaining.push(src.slice(eStart, eEnd));
-              }
-              fixes.push(fixer.replaceTextRange(depsArg.range, `[${remaining.join(", ")}]`));
-
-              return fixes;
-            },
+              : undefined,
           });
         }
       },

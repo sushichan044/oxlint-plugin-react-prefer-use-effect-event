@@ -774,9 +774,13 @@ const Component = () => {
   });
 
   describe("event handler name conflict avoidance", () => {
-    it("renames when an existing useEffectEvent wrapper already owns the default name", () => {
+    // When `${handlerName}Event` would clash with an existing binding, the rule still reports the
+    // violation but skips autofix entirely. Coining a suffix would force the user to live with a
+    // generated name; reporting without a fix lets them pick one that fits their codebase.
+
+    it("reports without fixing when an existing useEffectEvent wrapper already owns the default name", () => {
       // The user already wrapped an unrelated handler whose generated name happens to be
-      // `navigateEvent`. Reusing that name would clash; the autofix coins `_1` instead.
+      // `navigateEvent`. Reusing that name would redeclare the existing const.
       expect(() => {
         runRule({
           valid: [],
@@ -794,18 +798,7 @@ const Component = ({ trackPage }) => {
   }, [navigate, navigateEvent]);
 };`,
               errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
-              output: `import { useEffect, useEffectEvent } from "react";
-import { useNavigate } from "react-router";
-
-const Component = ({ trackPage }) => {
-  const navigate = useNavigate();
-  const navigateEvent = useEffectEvent(() => trackPage("navigate"));
-  const navigateEvent_1 = useEffectEvent(navigate);
-  useEffect(() => {
-    navigateEvent_1("/path");
-    navigateEvent();
-  }, [navigateEvent]);
-};`,
+              output: null,
               options: callReturnOptions,
             },
           ],
@@ -813,10 +806,10 @@ const Component = ({ trackPage }) => {
       }).not.toThrow();
     });
 
-    it("renames when an imported binding of the default name is referenced inside the callback", () => {
-      // Realistic outer-scope collision: an analytics constant imported under the same name
-      // is referenced inside the effect. Declaring `navigateEvent` in component scope would
-      // shadow that import for the in-callback reference.
+    it("reports without fixing when an imported binding of the default name is referenced inside the callback", () => {
+      // Outer-scope collision: an analytics constant imported under the same name is referenced
+      // inside the effect. A new component-scope const would shadow that import for the
+      // in-callback reference.
       expect(() => {
         runRule({
           valid: [],
@@ -834,18 +827,7 @@ const Component = ({ track }) => {
   }, [navigate]);
 };`,
               errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
-              output: `import { useEffect, useEffectEvent } from "react";
-import { useNavigate } from "react-router";
-import { navigateEvent } from "./analytics-events";
-
-const Component = ({ track }) => {
-  const navigate = useNavigate();
-  const navigateEvent_1 = useEffectEvent(navigate);
-  useEffect(() => {
-    navigateEvent_1("/path");
-    track(navigateEvent);
-  }, []);
-};`,
+              output: null,
               options: callReturnOptions,
             },
           ],
@@ -853,10 +835,10 @@ const Component = ({ track }) => {
       }).not.toThrow();
     });
 
-    it("renames when a cleanup function inside the callback declares the default name", () => {
-      // Realistic descendant-scope collision: the effect's cleanup function declares its own
-      // local `navigateEvent`. Without renaming, the rewritten call site inside the cleanup
-      // would resolve to that local instead of the wrapper.
+    it("reports without fixing when a cleanup function inside the callback declares the default name", () => {
+      // Descendant-scope collision: the effect's cleanup function declares its own local
+      // `navigateEvent`. A rewritten call site inside that cleanup would resolve to the local
+      // instead of the would-be wrapper.
       expect(() => {
         runRule({
           valid: [],
@@ -876,63 +858,7 @@ const Component = ({ trackUnmount, cleanup }) => {
   }, [navigate]);
 };`,
               errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
-              output: `import { useEffect, useEffectEvent } from "react";
-import { useNavigate } from "react-router";
-
-const Component = ({ trackUnmount, cleanup }) => {
-  const navigate = useNavigate();
-  const navigateEvent_1 = useEffectEvent(navigate);
-  useEffect(() => {
-    navigateEvent_1("/path");
-    return () => {
-      const navigateEvent = trackUnmount();
-      cleanup(navigateEvent);
-    };
-  }, []);
-};`,
-              options: callReturnOptions,
-            },
-          ],
-        });
-      }).not.toThrow();
-    });
-
-    it("walks the suffix counter past existing useEffectEvent wrappers that share the prefix", () => {
-      // After repeated rounds of this autofix on adjacent handlers, the user can end up with
-      // a chain of `${name}Event` / `${name}Event_1` wrappers. A new fix must skip them all.
-      expect(() => {
-        runRule({
-          valid: [],
-          invalid: [
-            {
-              code: `import { useEffect, useEffectEvent } from "react";
-import { useNavigate } from "react-router";
-
-const Component = ({ trackPage, trackBack }) => {
-  const navigate = useNavigate();
-  const navigateEvent = useEffectEvent(() => trackPage());
-  const navigateEvent_1 = useEffectEvent(() => trackBack());
-  useEffect(() => {
-    navigate("/path");
-    navigateEvent();
-    navigateEvent_1();
-  }, [navigate, navigateEvent, navigateEvent_1]);
-};`,
-              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
-              output: `import { useEffect, useEffectEvent } from "react";
-import { useNavigate } from "react-router";
-
-const Component = ({ trackPage, trackBack }) => {
-  const navigate = useNavigate();
-  const navigateEvent = useEffectEvent(() => trackPage());
-  const navigateEvent_1 = useEffectEvent(() => trackBack());
-  const navigateEvent_2 = useEffectEvent(navigate);
-  useEffect(() => {
-    navigateEvent_2("/path");
-    navigateEvent();
-    navigateEvent_1();
-  }, [navigateEvent, navigateEvent_1]);
-};`,
+              output: null,
               options: callReturnOptions,
             },
           ],
