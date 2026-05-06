@@ -1,4 +1,4 @@
-import type { ESTree, Variable } from "@oxlint/plugins";
+import type { ESTree, Fix, Variable } from "@oxlint/plugins";
 import type { TargetSpec } from "./types";
 
 import { defineRule } from "@oxlint/plugins";
@@ -408,7 +408,7 @@ const preferUseEffectEvent = defineRule({
             fix: canAutofix
               ? (fixer) => {
                   const src = context.sourceCode.getText();
-                  const fixes = [];
+                  const fixes: Fix[] = [];
 
                   const eventCalleeText = resolveEventCalleeText(
                     capturedReactImport,
@@ -421,7 +421,7 @@ const preferUseEffectEvent = defineRule({
                     capturedReactImport.useEffectEventLocalName === null
                   ) {
                     const namedSpecifiers = capturedReactImport.node.specifiers.filter(
-                      (s): s is ESTree.ImportSpecifier => s.type === "ImportSpecifier",
+                      (s) => s.type === "ImportSpecifier",
                     );
                     const lastNamed = namedSpecifiers[namedSpecifiers.length - 1];
                     // When the import has only a default/namespace specifier we don't need to
@@ -446,9 +446,8 @@ const preferUseEffectEvent = defineRule({
 
                   // 3. Replace handler call sites within the callback body.
                   if (callbackArg?.type === "ArrowFunctionExpression") {
-                    const { body } = callbackArg;
-                    if (body.type === "BlockStatement") {
-                      for (const call of collectCallSitesOfVariable(variable, body)) {
+                    if (callbackArg.body.type === "BlockStatement") {
+                      for (const call of collectCallSitesOfVariable(variable, callbackArg.body)) {
                         fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
                       }
                     }
