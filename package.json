@@ -71,7 +71,7 @@
     "@virtual-live-lab/tsconfig": "catalog:dev",
     "eslint": "catalog:dev",
     "eslint-doc-generator": "catalog:dev",
-    "fs-fixture": "^2.13.0",
+    "fs-fixture": "catalog:dev",
     "oxfmt": "catalog:dev",
     "oxlint": "catalog:dev",
     "oxlint-tsgolint": "catalog:dev",

@@ -11,6 +11,7 @@ catalogs:
     '@virtual-live-lab/tsconfig': 2.1.21
     eslint: 9.39.2
     eslint-doc-generator: 3.3.2
+    fs-fixture: 2.13.0
     oxfmt: 0.47.0
     oxlint: 1.62.0
     oxlint-tsgolint: 0.22.1

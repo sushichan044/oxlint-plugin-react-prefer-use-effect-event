@@ -24,6 +24,9 @@ catalogs:
     eslint-doc-generator:
       specifier: 3.3.2
       version: 3.3.2
+    fs-fixture:
+      specifier: 2.13.0
+      version: 2.13.0
     oxfmt:
       specifier: 0.47.0
       version: 0.47.0
@@ -114,7 +117,7 @@ importers:
         specifier: catalog:dev
         version: 3.3.2(eslint@9.39.2(jiti@2.6.1))(typescript@6.0.3)
       fs-fixture:
-        specifier: ^2.13.0
+        specifier: catalog:dev
         version: 2.13.0
       oxfmt:
         specifier: catalog:dev
