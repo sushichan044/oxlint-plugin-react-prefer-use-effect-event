@@ -16,7 +16,7 @@
   "bugs": {
     "url": "https://github.com/sushichan044/oxlint-plugin-react-prefer-use-effect-event/issues"
   },
-  "license": "",
+  "license": "MIT",
   "author": {
     "name": "sushichan044",
     "url": "https://github.com/sushichan044"
