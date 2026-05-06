@@ -1,100 +1,150 @@
 import type { ESTree, Scope } from "@oxlint/plugins";
+import { Linter } from "eslint";
 import { describe, expect, it } from "vitest";
 import { isBindingNameAvailable } from "./scope-utils";
 
-function makeScope(params: {
-  names?: string[];
-  upper?: Scope | null;
-  children?: Scope[];
-  blockRange?: [number, number];
-}): Scope {
-  return {
-    set: new Map(params.names?.map((n) => [n, {}]) ?? []),
-    upper: params.upper ?? null,
-    childScopes: params.children ?? [],
-    block: { range: params.blockRange ?? [0, 100] } as ESTree.Node,
-  } as unknown as Scope;
-}
+/**
+ * Parse `code` with ESLint's scope analysis, locate the `useEffect(...)` call, and return the scope
+ * at that call site together with the callback argument node. This gives us real Scope objects (not
+ * mocks) so the tests read like real usage.
+ */
+function extractUseEffectContext(code: string): {
+  insertScope: Scope;
+  callbackNode: ESTree.Node;
+} {
+  const linter = new Linter({ configType: "flat" });
+  let insertScope: Scope | null = null;
+  let callbackNode: ESTree.Node | null = null;
 
-function makeCallbackNode(range: [number, number]): ESTree.Node {
-  return { range } as ESTree.Node;
+  linter.verify(code, [
+    {
+      plugins: {
+        test: {
+          rules: {
+            capture: {
+              create(ctx) {
+                return {
+                  CallExpression(node) {
+                    if (node.callee.type === "Identifier" && node.callee.name === "useEffect") {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      insertScope = (ctx.sourceCode as any).getScope(node) as unknown as Scope;
+                      callbackNode = node.arguments[0] as unknown as ESTree.Node;
+                    }
+                  },
+                };
+              },
+            },
+          },
+        },
+      },
+      rules: { "test/capture": "error" },
+      languageOptions: { parserOptions: { range: true } },
+    },
+  ]);
+
+  if (!insertScope || !callbackNode) throw new Error("useEffect not found in code");
+  return { insertScope, callbackNode };
 }
 
 describe("isBindingNameAvailable", () => {
-  it("returns true when the name is not present in any scope", () => {
-    const parent = makeScope({ names: ["otherVar"] });
-    const scope = makeScope({ upper: parent });
-    expect(isBindingNameAvailable("newName", scope)).toBe(true);
+  describe("ancestor / insertScope checks", () => {
+    it("returns true when the name is not declared anywhere in scope", () => {
+      const { insertScope, callbackNode } = extractUseEffectContext(`
+        const Component = () => {
+          const navigate = () => {};
+          useEffect(() => { navigate(); }, [navigate]);
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope, callbackNode)).toBe(true);
+    });
+
+    it("returns false when the name is already declared in insertScope (component body)", () => {
+      const { insertScope, callbackNode } = extractUseEffectContext(`
+        const Component = () => {
+          const navigate = () => {};
+          const navigateEvent = () => {};
+          useEffect(() => { navigate(); }, [navigate]);
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope, callbackNode)).toBe(false);
+    });
+
+    it("returns false when the name is declared in an outer scope (e.g. module-level import)", () => {
+      const { insertScope, callbackNode } = extractUseEffectContext(`
+        const navigateEvent = "module-level";
+        const Component = () => {
+          const navigate = () => {};
+          useEffect(() => { navigate(); track(navigateEvent); }, [navigate]);
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope, callbackNode)).toBe(false);
+    });
   });
 
-  it("returns false when the name is declared in insertScope itself", () => {
-    const scope = makeScope({ names: ["newName"] });
-    expect(isBindingNameAvailable("newName", scope)).toBe(false);
+  describe("descendant scope checks (callback-range narrowing)", () => {
+    it("returns false when a scope INSIDE the callback declares the name", () => {
+      // The cleanup function is a descendant scope that lives inside the callback.
+      // A rewritten call site inside it would resolve to the cleanup-local binding.
+      const { insertScope, callbackNode } = extractUseEffectContext(`
+        const Component = () => {
+          const navigate = () => {};
+          useEffect(() => {
+            navigate("/path");
+            return () => {
+              const navigateEvent = cleanup();
+              navigate("/cleanup");
+            };
+          }, [navigate]);
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope, callbackNode)).toBe(false);
+    });
+
+    it("returns true when the name is only in a nested function OUTSIDE the callback", () => {
+      // handleOther is a sibling of the callback in the component scope, not a child of it.
+      // The fix would insert `const navigateEvent = ...` at component level; inside
+      // handleOther its own local `navigateEvent` shadows it harmlessly — no rewritten
+      // call site is affected.
+      const { insertScope, callbackNode } = extractUseEffectContext(`
+        const Component = () => {
+          const navigate = () => {};
+          const handleOther = () => {
+            const navigateEvent = "unrelated";
+          };
+          useEffect(() => { navigate("/path"); }, [navigate]);
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope, callbackNode)).toBe(true);
+    });
+
+    it("returns true when the colliding nested function is defined AFTER the useEffect call", () => {
+      const { insertScope, callbackNode } = extractUseEffectContext(`
+        const Component = () => {
+          const navigate = () => {};
+          useEffect(() => { navigate("/path"); }, [navigate]);
+          const handleLater = () => {
+            const navigateEvent = "unrelated";
+          };
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope, callbackNode)).toBe(true);
+    });
   });
 
-  it("returns false when the name is declared in an ancestor scope", () => {
-    const grandparent = makeScope({ names: ["newName"] });
-    const parent = makeScope({ upper: grandparent });
-    const scope = makeScope({ upper: parent });
-    expect(isBindingNameAvailable("newName", scope)).toBe(false);
-  });
-
-  describe("without callbackNode (conservative mode — all descendants checked)", () => {
-    it("returns false when the name is in a direct child scope", () => {
-      const child = makeScope({ names: ["newName"] });
-      const scope = makeScope({ children: [child] });
-      expect(isBindingNameAvailable("newName", scope)).toBe(false);
-    });
-
-    it("returns false when the name is in a deeply nested scope", () => {
-      const grandchild = makeScope({ names: ["newName"] });
-      const child = makeScope({ children: [grandchild] });
-      const scope = makeScope({ children: [child] });
-      expect(isBindingNameAvailable("newName", scope)).toBe(false);
-    });
-  });
-
-  describe("with callbackNode — descendant check narrows to callback range", () => {
-    it("returns false when the name is in a descendant scope inside the callback range", () => {
-      // cleanup function at [50, 80] is inside the callback [30, 90]
-      const callback = makeCallbackNode([30, 90]);
-      const cleanup = makeScope({ names: ["newName"], blockRange: [50, 80] });
-      const scope = makeScope({ children: [cleanup] });
-      expect(isBindingNameAvailable("newName", scope, callback)).toBe(false);
-    });
-
-    it("returns true when the name is only in a descendant scope OUTSIDE the callback range", () => {
-      // handleOther at [0, 25] is outside the callback [30, 90]
-      // This was a false positive with the old conservative check
-      const callback = makeCallbackNode([30, 90]);
-      const handleOther = makeScope({ names: ["newName"], blockRange: [0, 25] });
-      const scope = makeScope({ children: [handleOther] });
-      expect(isBindingNameAvailable("newName", scope, callback)).toBe(true);
-    });
-
-    it("returns true when the name appears in both inside and outside scopes only outside", () => {
-      // One unrelated function before callback, one clean scope inside callback
-      const callback = makeCallbackNode([30, 90]);
-      const outsideScope = makeScope({ names: ["newName"], blockRange: [0, 25] });
-      const insideScope = makeScope({ blockRange: [40, 80] }); // no "newName"
-      const scope = makeScope({ children: [outsideScope, insideScope] });
-      expect(isBindingNameAvailable("newName", scope, callback)).toBe(true);
-    });
-
-    it("skips descendants of out-of-range scopes even if deeply nested", () => {
-      // deeply nested child inside an out-of-range parent should also be skipped
-      const callback = makeCallbackNode([30, 90]);
-      const deepChild = makeScope({ names: ["newName"], blockRange: [5, 20] });
-      const outsideParent = makeScope({ children: [deepChild], blockRange: [0, 25] });
-      const scope = makeScope({ children: [outsideParent] });
-      expect(isBindingNameAvailable("newName", scope, callback)).toBe(true);
-    });
-
-    it("still checks ancestor scopes regardless of callbackNode", () => {
-      const callback = makeCallbackNode([30, 90]);
-      const parent = makeScope({ names: ["newName"] });
-      const scope = makeScope({ upper: parent });
-      expect(isBindingNameAvailable("newName", scope, callback)).toBe(false);
+  describe("conservative mode (no callbackNode)", () => {
+    it("returns false for a descendant scope even when it is outside the callback", () => {
+      // Without callbackNode the check is conservative: any descendant scope collision
+      // suppresses the fix, including unrelated nested functions.
+      const { insertScope } = extractUseEffectContext(`
+        const Component = () => {
+          const navigate = () => {};
+          const handleOther = () => {
+            const navigateEvent = "unrelated";
+          };
+          useEffect(() => { navigate("/path"); }, [navigate]);
+        };
+      `);
+      expect(isBindingNameAvailable("navigateEvent", insertScope)).toBe(false);
     });
   });
 });
