@@ -393,10 +393,11 @@ const preferUseEffectEvent = defineRule({
           const handlerName = element.name;
           const eventName = `${handlerName}Event`;
           const insertScope = context.sourceCode.getScope(node);
+          const callbackArg = node.arguments[0];
           // Drop the autofix entirely when the coined name would clash. Renaming to
           // `${name}Event_1` etc. would force the user to read a generated suffix; reporting
           // without a fix lets them pick a name that fits their codebase.
-          const canAutofix = isBindingNameAvailable(eventName, insertScope);
+          const canAutofix = isBindingNameAvailable(eventName, insertScope, callbackArg);
           const capturedReactImport = reactImport;
           const capturedExportName = useEffectEventExportName;
 
@@ -444,7 +445,6 @@ const preferUseEffectEvent = defineRule({
                   );
 
                   // 3. Replace handler call sites within the callback body.
-                  const callbackArg = node.arguments[0];
                   if (callbackArg?.type === "ArrowFunctionExpression") {
                     const { body } = callbackArg;
                     if (body.type === "BlockStatement") {

@@ -68,15 +68,31 @@ export class ScopeIndex {
  * The autofix coins a `${handlerName}Event` const in `insertScope` and rewrites call sites inside
  * the `useEffect` callback to reference it. The name is unsafe when it's already declared in
  * `insertScope` (redeclaration), in any ancestor scope (the new const would shadow that binding for
- * unrelated references inside the callback), or in any descendant scope (a rewritten call site
- * inside the callback would resolve to the descendant binding instead of the wrapper).
+ * unrelated references inside the callback), or in any descendant scope within the callback (a
+ * rewritten call site inside that scope would resolve to the local binding instead of the
+ * wrapper).
+ *
+ * When `callbackNode` is provided, the descendant check is limited to scopes whose block falls
+ * entirely within the callback's range, avoiding false positives from unrelated nested functions
+ * elsewhere in the component. Without it, all descendants are checked conservatively.
  */
-export function isBindingNameAvailable(name: string, insertScope: Scope): boolean {
+export function isBindingNameAvailable(
+  name: string,
+  insertScope: Scope,
+  callbackNode?: ESTree.Node | null,
+): boolean {
   for (let s: Scope | null = insertScope; s !== null; s = s.upper) {
     if (s.set.has(name)) return false;
   }
+  const callbackRange = callbackNode?.range;
   const stack: Scope[] = [...insertScope.childScopes];
   for (let scope = stack.pop(); scope !== undefined; scope = stack.pop()) {
+    if (callbackRange) {
+      const [blockStart, blockEnd] = scope.block.range;
+      if (blockStart < callbackRange[0] || blockEnd > callbackRange[1]) {
+        continue;
+      }
+    }
     if (scope.set.has(name)) return false;
     stack.push(...scope.childScopes);
   }
