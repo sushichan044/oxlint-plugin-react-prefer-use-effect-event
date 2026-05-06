@@ -773,6 +773,145 @@ const Component = () => {
     });
   });
 
+  describe("event handler name conflict avoidance", () => {
+    // When `${handlerName}Event` would clash with an existing binding, the rule still reports the
+    // violation but skips autofix entirely. Coining a suffix would force the user to live with a
+    // generated name; reporting without a fix lets them pick one that fits their codebase.
+
+    it("reports without fixing when an existing useEffectEvent wrapper already owns the default name", () => {
+      // The user already wrapped an unrelated handler whose generated name happens to be
+      // `navigateEvent`. Reusing that name would redeclare the existing const.
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ trackPage }) => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(() => trackPage("navigate"));
+  useEffect(() => {
+    navigate("/path");
+    navigateEvent();
+  }, [navigate, navigateEvent]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: null,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("reports without fixing when an imported binding of the default name is referenced inside the callback", () => {
+      // Outer-scope collision: an analytics constant imported under the same name is referenced
+      // inside the effect. A new component-scope const would shadow that import for the
+      // in-callback reference.
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+import { navigateEvent } from "./analytics-events";
+
+const Component = ({ track }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+    track(navigateEvent);
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: null,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("reports without fixing when a cleanup function inside the callback declares the default name", () => {
+      // Descendant-scope collision: the cleanup function declares its own local `navigateEvent`
+      // AND calls navigate() — the rewritten call site inside the cleanup would resolve to the
+      // local variable instead of the would-be wrapper const.
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ trackUnmount, cleanup }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+    return () => {
+      const navigateEvent = trackUnmount();
+      navigate("/cleanup");
+      cleanup(navigateEvent);
+    };
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: null,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("applies the fix when the default name only collides in an unrelated nested function outside the callback", () => {
+      // handleOther declares its own `navigateEvent` but is completely unrelated to the
+      // useEffect callback. The fix inserts the wrapper const at component scope; inside
+      // handleOther the local const shadows it harmlessly — no rewritten call site is affected.
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const handleOther = () => {
+    const navigateEvent = "unrelated";
+    console.log(navigateEvent);
+  };
+  useEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const handleOther = () => {
+    const navigateEvent = "unrelated";
+    console.log(navigateEvent);
+  };
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+  });
+
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
   // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
   // the dedicated resolver unit tests and the e2e fixture rigs.
