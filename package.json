@@ -1,6 +1,6 @@
 {
   "name": "oxlint-plugin-react-prefer-use-effect-event",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "An Oxlint / ESLint plugin that suggests wrapping calls to event handlers of your choice inside `useEffect` with `useEffectEvent`.",
   "keywords": [
     "eslint",
