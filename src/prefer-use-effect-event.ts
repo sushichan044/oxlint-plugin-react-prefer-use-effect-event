@@ -2,7 +2,11 @@ import type { ESTree, Fix, Variable } from "@oxlint/plugins";
 import type { TargetSpec } from "./types";
 
 import { defineRule } from "@oxlint/plugins";
-import { collectCallSitesOfVariable } from "./ast-utils";
+import {
+  areAllReferencesDirectCallees,
+  collectCallSitesOfVariable,
+  getFunctionCallbackBody,
+} from "./ast-utils";
 import { Resolver } from "./resolver";
 
 import { isBindingNameAvailable, ScopeIndex } from "./scope-utils";
@@ -391,12 +395,25 @@ const preferUseEffectEvent = defineRule({
           if (!trackedHandlers.has(variable)) continue;
 
           const handlerName = element.name;
+          const callbackArg = node.arguments[0];
+          // The rule only inspects inline function callbacks — arrow (block or expression body)
+          // and function expressions. An identifier reference or any other expression has no body
+          // we can lint inside, so skip it.
+          const callbackBody = getFunctionCallbackBody(callbackArg);
+          if (!callbackBody) continue;
+
+          // Detection gate: every handler reference inside the body must be a direct callee.
+          // When the handler is also passed as a value (`addEventListener("popstate", handler)`),
+          // reassigned (`const fn = handler`), or otherwise referenced indirectly, rewriting only
+          // the callees would leave a dangling reference once the dep array drops the binding.
+          // Those shapes are intentionally not reported.
+          if (!areAllReferencesDirectCallees(variable, callbackBody)) continue;
+
           const eventName = `${handlerName}Event`;
           const insertScope = context.sourceCode.getScope(node);
-          const callbackArg = node.arguments[0];
-          // Drop the autofix entirely when the coined name would clash. Renaming to
-          // `${name}Event_1` etc. would force the user to read a generated suffix; reporting
-          // without a fix lets them pick a name that fits their codebase.
+          // Drop the autofix when the coined name would clash with an existing binding visible in
+          // the effect scope. Renaming to `${name}Event_1` etc. would force the user to read a
+          // generated suffix; reporting without a fix lets them pick a name that fits the codebase.
           const canAutofix = isBindingNameAvailable(eventName, insertScope, callbackArg);
           const capturedReactImport = reactImport;
           const capturedExportName = useEffectEventExportName;
@@ -444,13 +461,11 @@ const preferUseEffectEvent = defineRule({
                     ),
                   );
 
-                  // 3. Replace handler call sites within the callback body.
-                  if (callbackArg?.type === "ArrowFunctionExpression") {
-                    if (callbackArg.body.type === "BlockStatement") {
-                      for (const call of collectCallSitesOfVariable(variable, callbackArg.body)) {
-                        fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
-                      }
-                    }
+                  // 3. Replace handler call sites within the callback body. Works uniformly for
+                  // block and expression bodies because the call sites are looked up by scope
+                  // references, not by AST shape.
+                  for (const call of collectCallSitesOfVariable(variable, callbackBody)) {
+                    fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
                   }
 
                   // 4. Drop the handler from the dependency array.
