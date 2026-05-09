@@ -40,3 +40,41 @@ export function collectCallSitesOfVariable(
   }
   return results;
 }
+
+/**
+ * Whether every reference of `variable` inside `range` is the direct callee of a `CallExpression`
+ * (`f(...)` style). Returns `true` when there are no references in range.
+ *
+ * Used as the rule's detection gate: rewriting only callee references would leave a dangling
+ * reference when the handler also appears as a value (`subscribe(handler)`), is reassigned (`const
+ * fn = handler`), or is used inside JSX, so those shapes are intentionally not reported.
+ */
+export function areAllReferencesDirectCallees(
+  variable: Variable,
+  range: { range: Range },
+): boolean {
+  const [rangeStart, rangeEnd] = range.range;
+  for (const ref of variable.references) {
+    const id = ref.identifier;
+    const [idStart, idEnd] = id.range;
+    if (idStart < rangeStart || idEnd > rangeEnd) continue;
+    if (!getDirectParentCall(id)) return false;
+  }
+  return true;
+}
+
+/**
+ * Body of a function-like `useEffect` callback argument. Normalises the three lintable shapes —
+ * arrow with block body (`() => { … }`), arrow with expression body (`() => f()`), and function
+ * expression (`function () { … }`) — to a single node whose `range` covers the inspectable region.
+ *
+ * Returns `null` for any other argument shape (identifier reference, conditional, etc.); callers
+ * skip those because there is no inline function body to inspect or rewrite.
+ */
+export function getFunctionCallbackBody(node: ESTree.Node | null | undefined): ESTree.Node | null {
+  if (!node) return null;
+  if (node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression") {
+    return node.body;
+  }
+  return null;
+}
