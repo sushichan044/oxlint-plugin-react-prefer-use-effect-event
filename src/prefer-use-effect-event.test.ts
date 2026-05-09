@@ -1066,6 +1066,30 @@ const Component = ({ subscribe }) => {
         });
       }).not.toThrow();
     });
+
+    it("does not flag a handler listed in deps but never used in the callback body", () => {
+      // The handler is in the dependency array but the callback body does not reference it at all
+      // (a stray dep). Wrapping it in `useEffectEvent` would produce dead code, so the rule must
+      // not fire — react-hooks/exhaustive-deps is the right rule to flag the unused dep.
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(function banana() {
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
   });
 
   describe("callback shape variations", () => {

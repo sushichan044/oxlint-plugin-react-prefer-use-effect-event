@@ -409,6 +409,12 @@ const preferUseEffectEvent = defineRule({
           // Those shapes are intentionally not reported.
           if (!areAllReferencesDirectCallees(variable, callbackBody)) continue;
 
+          // Also require at least one call site in the body. The handler may be listed in the
+          // dependency array without being used inside the callback (a stray dep) — wrapping it
+          // in `useEffectEvent` produces dead code, so do not report.
+          const callSites = collectCallSitesOfVariable(variable, callbackBody);
+          if (callSites.length === 0) continue;
+
           const eventName = `${handlerName}Event`;
           const insertScope = context.sourceCode.getScope(node);
           // Drop the autofix when the coined name would clash with an existing binding visible in
@@ -464,7 +470,7 @@ const preferUseEffectEvent = defineRule({
                   // 3. Replace handler call sites within the callback body. Works uniformly for
                   // block and expression bodies because the call sites are looked up by scope
                   // references, not by AST shape.
-                  for (const call of collectCallSitesOfVariable(variable, callbackBody)) {
+                  for (const call of callSites) {
                     fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
                   }
 
