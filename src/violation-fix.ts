@@ -1,4 +1,4 @@
-import type { Fix, Fixer } from "@oxlint/plugins";
+import type { Fix, Fixer, SourceCode } from "@oxlint/plugins";
 import type { ReactImportState } from "./react-import-state";
 import type { HandlerViolation } from "./violation-detection";
 
@@ -16,7 +16,7 @@ export function buildViolationFix(
   violation: HandlerViolation,
   reactImport: ReactImportState | null,
   exportName: string,
-  source: string,
+  sourceCode: SourceCode,
   fixer: Fixer,
 ): Fix[] {
   const eventName = `${violation.handlerName}Event`;
@@ -24,9 +24,9 @@ export function buildViolationFix(
   const fixes: Fix[] = [];
 
   addUseEffectEventImport(fixes, fixer, reactImport, exportName);
-  insertWrapperDeclaration(fixes, fixer, violation, source, eventName, eventCalleeText);
+  insertWrapperDeclaration(fixes, fixer, violation, sourceCode, eventName, eventCalleeText);
   replaceCallSites(fixes, fixer, violation, eventName);
-  removeFromDepsArray(fixes, fixer, violation, source);
+  removeFromDepsArray(fixes, fixer, violation, sourceCode);
 
   return fixes;
 }
@@ -63,13 +63,14 @@ function insertWrapperDeclaration(
   fixes: Fix[],
   fixer: Fixer,
   violation: HandlerViolation,
-  source: string,
+  sourceCode: SourceCode,
   eventName: string,
   eventCalleeText: string,
 ): void {
+  const text = sourceCode.getText();
   const [nodeStart] = violation.useEffectNode.range;
-  const lineStart = source.lastIndexOf("\n", nodeStart - 1) + 1;
-  const indent = source.slice(lineStart, nodeStart);
+  const lineStart = text.lastIndexOf("\n", nodeStart - 1) + 1;
+  const indent = text.slice(lineStart, nodeStart);
   fixes.push(
     fixer.insertTextBeforeRange(
       violation.useEffectNode.range,
@@ -95,22 +96,38 @@ function replaceCallSites(
 }
 
 /**
- * Fix-D — Remove the handler Identifier from the dependency array, preserving every other element
- * verbatim.
+ * Fix-D — Remove the handler Identifier from the dependency array.
+ *
+ * Surgically removes the element along with its adjacent comma so the array's surrounding
+ * formatting (line breaks, comments outside the removed span) stays intact. Prefers the trailing
+ * comma when one exists; falls back to the preceding comma for the last element; falls back to
+ * removing only the element when it is the only one in the array.
  */
 function removeFromDepsArray(
   fixes: Fix[],
   fixer: Fixer,
   violation: HandlerViolation,
-  source: string,
+  sourceCode: SourceCode,
 ): void {
-  const remaining: string[] = [];
-  const [elementStart] = violation.depElement.range;
-  for (const e of violation.depsArray.elements) {
-    if (!e) continue;
-    const [eStart, eEnd] = e.range;
-    if (eStart === elementStart) continue;
-    remaining.push(source.slice(eStart, eEnd));
+  const tokenAfter = sourceCode.getTokenAfter(violation.depElement);
+  if (tokenAfter && tokenAfter.value === ",") {
+    // Extend the removal up to the next token so the inter-element whitespace goes with the
+    // comma, leaving `[a, c]` rather than `[a,  c]` when `b` is removed.
+    const tokenAfterComma = sourceCode.getTokenAfter(tokenAfter);
+    const removeEnd = tokenAfterComma ? tokenAfterComma.range[0] : tokenAfter.range[1];
+    fixes.push(fixer.removeRange([violation.depElement.range[0], removeEnd]));
+    return;
   }
-  fixes.push(fixer.replaceTextRange(violation.depsArray.range, `[${remaining.join(", ")}]`));
+
+  const tokenBefore = sourceCode.getTokenBefore(violation.depElement);
+  if (tokenBefore && tokenBefore.value === ",") {
+    // Last element: start the removal at the previous token's end so the comma and the
+    // whitespace before this element are consumed together.
+    const tokenBeforeComma = sourceCode.getTokenBefore(tokenBefore);
+    const removeStart = tokenBeforeComma ? tokenBeforeComma.range[1] : tokenBefore.range[0];
+    fixes.push(fixer.removeRange([removeStart, violation.depElement.range[1]]));
+    return;
+  }
+
+  fixes.push(fixer.removeRange(violation.depElement.range));
 }

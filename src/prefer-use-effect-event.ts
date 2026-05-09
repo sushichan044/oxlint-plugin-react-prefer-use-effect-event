@@ -324,7 +324,7 @@ const preferUseEffectEvent = defineRule({
                     violation,
                     capturedReactImport,
                     capturedExportName,
-                    context.sourceCode.getText(),
+                    context.sourceCode,
                     fixer,
                   )
               : undefined,
