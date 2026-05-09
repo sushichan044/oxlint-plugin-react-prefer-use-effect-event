@@ -912,6 +912,254 @@ const Component = () => {
     });
   });
 
+  describe("handler arguments referring to useEffect-local variables", () => {
+    // A naive "extract the handler body into useEffectEvent" rewrite would place
+    // `useEffectEvent(() => handler(localVar))` at the component scope, where `localVar` —
+    // declared inside the effect callback — is out of scope.
+    //
+    // The rule deliberately sidesteps this by wrapping the function REFERENCE instead
+    // (`useEffectEvent(handler)`). The rewritten call site stays inside the effect callback and
+    // keeps the original argument list, so any callback-local variable passed as an argument
+    // remains in scope at the rewritten call.
+
+    it("rewrites the call without moving the local-variable arguments out of scope", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  useEffect(() => {
+    const message = "hello";
+    notify(message);
+  }, [notify]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "notify" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  const notifyEvent = useEffectEvent(notify);
+  useEffect(() => {
+    const message = "hello";
+    notifyEvent(message);
+  }, []);
+};`,
+              options: valueOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("keeps a mix of callback-local and component-scope arguments in scope", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ pathPrefix }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const suffix = "/details";
+    navigate(\`\${pathPrefix}\${suffix}\`);
+  }, [navigate, pathPrefix]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ pathPrefix }) => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    const suffix = "/details";
+    navigateEvent(\`\${pathPrefix}\${suffix}\`);
+  }, [pathPrefix]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("non-callee handler references inside the callback", () => {
+    // Detection requires every handler reference inside the callback body to be a direct callee
+    // (`handler(...)`). When the handler also appears as a value, is reassigned to a local, or is
+    // otherwise referenced indirectly, the rule does not fire — rewriting only the callee sites
+    // would leave a dangling reference once the dep array drops the binding.
+
+    it("does not flag when the handler is passed as a value to addEventListener", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    window.addEventListener("popstate", navigate);
+    return () => window.removeEventListener("popstate", navigate);
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the handler is reassigned to a local before being called", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const fn = navigate;
+    fn("/path");
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the callback mixes callee and non-callee references", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ subscribe }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/before");
+    subscribe(navigate);
+    navigate("/after");
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag a handler listed in deps but never used in the callback body", () => {
+      // The handler is in the dependency array but the callback body does not reference it at all
+      // (a stray dep). Wrapping it in `useEffectEvent` would produce dead code, so the rule must
+      // not fire — react-hooks/exhaustive-deps is the right rule to flag the unused dep.
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(function banana() {
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe("callback shape variations", () => {
+    // Detection works against the function body regardless of callback shape. Arrow with block
+    // body, arrow with expression body, and function expression all expose a `body` node we can
+    // scan for handler references and rewrite call sites in.
+
+    it("rewrites a single-expression arrow callback", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => navigate("/path"), [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => navigateEvent("/path"), []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a function-expression callback", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(function () {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(function () {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+  });
+
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
   // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
   // the dedicated resolver unit tests and the e2e fixture rigs.

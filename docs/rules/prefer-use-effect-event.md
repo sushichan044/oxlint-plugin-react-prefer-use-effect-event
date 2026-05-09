@@ -75,6 +75,18 @@ useEffect(() => {
 
 > **Note:** The fix is suppressed when the generated name would conflict with an existing binding visible in the effect scope (e.g. an import or another const in the same component). In that case, the rule still reports the violation so you can apply an equivalent fix manually under a name that fits your codebase.
 
+## Detection scope
+
+The rule fires only when **every** reference to the handler inside the `useEffect` callback body is a direct call (`handler(...)`). Callback shape doesn't matter — arrow with block body, arrow with expression body (`useEffect(() => handler(), deps)`), and function expressions (`useEffect(function () { … }, deps)`) are all detected and fixed the same way.
+
+The rule deliberately does **not** fire when the handler appears in any non-callee position inside the callback, such as:
+
+- Passed as a value: `addEventListener("popstate", handler)`
+- Reassigned to a local: `const fn = handler; fn()`
+- Mixed call sites and value references in the same callback
+
+In those cases, rewriting only the call sites would leave a dangling reference to the original handler while the dependency array drops it. Refactor the surrounding code so that every reference becomes a direct call, then re-run the linter.
+
 ## Options
 
 ### `targets`
