@@ -1,18 +1,74 @@
-import type { ESTree, Fix, Variable } from "@oxlint/plugins";
+/**
+ * `prefer-use-effect-event` rule, structured as three phases.
+ *
+ * ## Inputs
+ *
+ * - `targets: TargetSpec[]` — handler bindings to track. Empty disables the rule for the file.
+ * - `experimentalUseEffectEvent?: boolean` — picks the wrapper export name. `false` (default) →
+ *   `useEffectEvent`. `true` → `experimental_useEffectEvent`.
+ *
+ * ## Collect (`ImportDeclaration`, `VariableDeclarator`)
+ *
+ * Builds per-file state read by Detect/Fix:
+ *
+ * - `ReactImportState` — `useEffect` binding/local-name, default/namespace specifier, existing
+ *   `useEffectEvent`/`experimental_useEffectEvent` local name.
+ * - `trackedHandlers` — Variable → TargetSpec, indexed by handler kind:
+ *
+ *   - `value` → the imported binding itself.
+ *   - `call-return` → the LHS Identifier of `const x = importedFn(...)`.
+ *   - `call-return-property` → each LHS ObjectPattern property whose key is in `properties`.
+ *
+ * ## Detect (`CallExpression`)
+ *
+ * For every Identifier in the dependency array of a `useEffect` call, emit a `HandlerViolation` iff
+ * all four conditions hold:
+ *
+ * 1. The Identifier resolves to a tracked handler.
+ * 2. The first argument is an inline arrow / function expression with a body.
+ * 3. Every reference to the handler inside that body is a direct callee (no value pass, no
+ *    reassignment, no JSX use).
+ * 4. The body contains at least one such call site (a stray dep is ignored).
+ *
+ * `useEffect` is recognised as the named-import form (via `reactImport.useEffectVariable`) or the
+ * `<ns>.useEffect` form (via `reactImport.namespaceVariable`); other shapes are rejected.
+ *
+ * ## Fix (when `${handlerName}Event` is available in the insertion scope)
+ *
+ * Four steps, in source order:
+ *
+ * - Fix-A — Add `useEffectEvent` to the React named imports if missing. Skipped when the local name
+ *   is already known or when the React import has only a default/namespace specifier.
+ * - Fix-B — Insert `const ${handlerName}Event = <calleeText>(${handlerName});` before the `useEffect`
+ *   call.
+ * - Fix-C — Replace each direct-callee call site inside the callback body with the wrapper name.
+ * - Fix-D — Remove the handler from the dependency array.
+ *
+ * `<calleeText>` priority: existing `useEffectEvent` local name → `<ns>.useEffectEvent` (when the
+ * React import has no named specifiers) → the export name from options (added by Fix-A).
+ */
 import type { TargetSpec } from "./types";
 
 import { defineRule } from "@oxlint/plugins";
 import {
-  areAllReferencesDirectCallees,
-  collectCallSitesOfVariable,
-  getFunctionCallbackBody,
-} from "./ast-utils";
+  collectHandlerBindings,
+  collectTrackedImport,
+  type CollectedTracking,
+} from "./handler-collection";
+import {
+  collectReactImport,
+  EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT,
+  isReactImport,
+  isUseEffectCall,
+  type ReactImportState,
+  USE_EFFECT_EVENT_EXPORT,
+} from "./react-import-state";
 import { Resolver } from "./resolver";
 
 import { isBindingNameAvailable, ScopeIndex } from "./scope-utils";
-import { matchModuleTarget } from "./tracked-imports";
-import { extractHandlersFromDeclarator } from "./tracked-handlers";
 import { getRuleDocsURL } from "./utils";
+import { detectViolations } from "./violation-detection";
+import { buildViolationFix } from "./violation-fix";
 
 type TargetOption = {
   targets: TargetSpec[];
@@ -27,71 +83,6 @@ type TargetOption = {
 
 export type Options = [TargetOption?];
 type MessageIds = "preferUseEffectEvent";
-
-const REACT_PACKAGE = "react";
-const USE_EFFECT_EXPORT = "useEffect";
-const USE_EFFECT_EVENT_EXPORT = "useEffectEvent";
-const EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT = "experimental_useEffectEvent";
-
-type ReactImportState = {
-  /**
-   * The `import ... from "react"` declaration node itself. Kept around so the autofix can mutate
-   * its specifier list (e.g. add `useEffectEvent`) without re-finding the declaration.
-   *
-   * @example
-   *   import React, { useEffect } from "react"; // this whole node
-   */
-  node: ESTree.ImportDeclaration;
-  /**
-   * Variable bound to the named `useEffect` specifier, if present. `null` when the file uses only a
-   * default/namespace import.
-   *
-   * @example
-   *   import { useEffect } from "react"; // the `useEffect` binding
-   *   import React from "react"; // null
-   */
-  useEffectVariable: Variable | null;
-  /**
-   * Local name of the `useEffect` named specifier (i.e. the `as` alias if renamed). Used as a
-   * fast-path filter before resolving identifier references.
-   *
-   * @example
-   *   import { useEffect } from "react"; // "useEffect"
-   *   import { useEffect as ue } from "react"; // "ue"
-   */
-  useEffectLocalName: string | null;
-  /**
-   * Local name under which `useEffectEvent` (or `experimental_useEffectEvent`) is already imported,
-   * accounting for `as` aliases. `null` when no event binding is imported yet.
-   *
-   * @example
-   *   import { useEffectEvent } from "react"; // "useEffectEvent"
-   *   import { experimental_useEffectEvent as useEffectEvent } from "react"; // "useEffectEvent"
-   *   import { useEffect } from "react"; // null
-   */
-  useEffectEventLocalName: string | null;
-  /**
-   * Variable bound to the default or namespace specifier (e.g. `import React from "react"` or
-   * `import * as React from "react"`). Used to recognise `React.useEffect(...)` calls.
-   *
-   * @example
-   *   import React from "react"; // the `React` binding
-   *   import * as React from "react"; // the `React` binding
-   *   import { useEffect } from "react"; // null
-   */
-  namespaceVariable: Variable | null;
-  /**
-   * Local name of the namespace/default specifier — used when emitting the wrapper callee in the
-   * `React.useEffectEvent` form.
-   *
-   * @example
-   *   import React from "react"; // "React"
-   *   import R from "react"; // "R"
-   *   import * as React from "react"; // "React"
-   *   import { useEffect } from "react"; // null
-   */
-  namespaceLocalName: string | null;
-};
 
 const preferUseEffectEvent = defineRule({
   meta: {
@@ -232,15 +223,16 @@ const preferUseEffectEvent = defineRule({
     let useEffectEventExportName = USE_EFFECT_EVENT_EXPORT;
 
     // Per-file state. `before` is not guaranteed to fire, so reset on `Program` too.
-    let trackedImports = new Map<Variable, TargetSpec>();
-    let trackedHandlers = new Map<Variable, TargetSpec>();
+    let tracking: CollectedTracking = {
+      trackedImports: new Map(),
+      trackedHandlers: new Map(),
+    };
     let reactImport: ReactImportState | null = null;
     let scopeIndex: ScopeIndex | null = null;
     let configDir: string | null | undefined;
 
     function resetState() {
-      trackedImports = new Map();
-      trackedHandlers = new Map();
+      tracking = { trackedImports: new Map(), trackedHandlers: new Map() };
       reactImport = null;
       scopeIndex = null;
       configDir = undefined;
@@ -266,7 +258,7 @@ const preferUseEffectEvent = defineRule({
         // No targets means no rule output is possible — skip the file entirely.
         if (fileTargets.length === 0) return false;
         // Skip the file if it doesn't contain useEffect at all.
-        if (!context.sourceCode.text.includes(USE_EFFECT_EXPORT)) {
+        if (!context.sourceCode.text.includes("useEffect")) {
           return false;
         }
 
@@ -282,211 +274,59 @@ const preferUseEffectEvent = defineRule({
       },
 
       ImportDeclaration(node) {
-        const isReact = node.source.value === REACT_PACKAGE;
-        let useEffectVariable: Variable | null = null;
-        let useEffectLocalName: string | null = null;
-        let useEffectEventLocalName: string | null = null;
-        let namespaceVariable: Variable | null = null;
-        let namespaceLocalName: string | null = null;
+        const index = ensureScopeIndex();
 
-        // Resolve the import source on demand — only file-source targets need it, and only if the
-        // `imported` name on a specifier matched first.
-        let resolvedImport: string | null | undefined;
-        const getResolvedImport = (): string | null => {
-          if (resolvedImport === undefined) {
-            resolvedImport = resolver.resolveImportSource(
-              context.physicalFilename,
-              node.source.value,
-            );
-          }
-          return resolvedImport;
-        };
-
-        for (const specifier of node.specifiers) {
-          // React-specific bookkeeping.
-          if (isReact) {
-            if (
-              specifier.type === "ImportDefaultSpecifier" ||
-              specifier.type === "ImportNamespaceSpecifier"
-            ) {
-              namespaceVariable = ensureScopeIndex().resolveDeclaration(specifier.local);
-              namespaceLocalName = specifier.local.name;
-            } else if (
-              specifier.type === "ImportSpecifier" &&
-              specifier.imported.type === "Identifier"
-            ) {
-              const importedName = specifier.imported.name;
-              if (importedName === USE_EFFECT_EXPORT) {
-                useEffectVariable = ensureScopeIndex().resolveDeclaration(specifier.local);
-                useEffectLocalName = specifier.local.name;
-              } else if (
-                importedName === USE_EFFECT_EVENT_EXPORT ||
-                importedName === EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT
-              ) {
-                useEffectEventLocalName = specifier.local.name;
-              }
-            }
-          }
-
-          // Tracked-import handling (any package, not just React).
-          if (specifier.type !== "ImportSpecifier" && specifier.type !== "ImportDefaultSpecifier")
-            continue;
-          const target = matchModuleTarget(specifier, node.source.value, fileTargets, {
-            configDir: ensureConfigDir(),
-            getResolvedImport,
-          });
-          if (!target) continue;
-
-          const variable = ensureScopeIndex().resolveDeclaration(specifier.local);
-          if (!variable) continue;
-
-          trackedImports.set(variable, target);
-
-          // For `value` handlers the imported binding *is* the handler.
-          if (target.handler.kind === "value") {
-            trackedHandlers.set(variable, target);
-          }
+        if (isReactImport(node)) {
+          reactImport = collectReactImport(node, index);
         }
 
-        if (isReact) {
-          reactImport = {
-            node,
-            useEffectVariable,
-            useEffectLocalName,
-            useEffectEventLocalName,
-            namespaceVariable,
-            namespaceLocalName,
-          };
-        }
+        collectTrackedImport(node, tracking, {
+          index,
+          fileTargets,
+          configDir: ensureConfigDir(),
+          resolveImportSource: (src) => resolver.resolveImportSource(context.physicalFilename, src),
+        });
       },
 
       VariableDeclarator(node) {
         // Without any tracked imports, no `const x = source(...)` can produce a handler.
-        if (trackedImports.size === 0) return;
+        if (tracking.trackedImports.size === 0) return;
 
-        const index = ensureScopeIndex();
-        const handlers = extractHandlersFromDeclarator(node, (callee) => {
-          const variable = index.resolveReference(callee);
-          if (!variable) return null;
-          return trackedImports.get(variable) ?? null;
-        });
-
-        for (const handler of handlers) {
-          const variable = index.resolveDeclaration(handler.binding);
-          if (variable) trackedHandlers.set(variable, handler.target);
-        }
+        collectHandlerBindings(node, tracking, ensureScopeIndex());
       },
 
       CallExpression(node) {
         // Nothing to report when no handlers have been tracked yet.
-        if (trackedHandlers.size === 0) return;
+        if (tracking.trackedHandlers.size === 0) return;
 
         const index = ensureScopeIndex();
         if (!isUseEffectCall(node, reactImport, index)) return;
 
-        const depsArg = node.arguments[1];
-        if (!depsArg || depsArg.type !== "ArrayExpression") return;
+        const violations = detectViolations(node, index, tracking.trackedHandlers);
 
-        for (const element of depsArg.elements) {
-          if (!element || element.type !== "Identifier") continue;
-
-          const variable = index.resolveReference(element);
-          if (!variable) continue;
-          if (!trackedHandlers.has(variable)) continue;
-
-          const handlerName = element.name;
-          const callbackArg = node.arguments[0];
-          // The rule only inspects inline function callbacks — arrow (block or expression body)
-          // and function expressions. An identifier reference or any other expression has no body
-          // we can lint inside, so skip it.
-          const callbackBody = getFunctionCallbackBody(callbackArg);
-          if (!callbackBody) continue;
-
-          // Detection gate: every handler reference inside the body must be a direct callee.
-          // When the handler is also passed as a value (`addEventListener("popstate", handler)`),
-          // reassigned (`const fn = handler`), or otherwise referenced indirectly, rewriting only
-          // the callees would leave a dangling reference once the dep array drops the binding.
-          // Those shapes are intentionally not reported.
-          if (!areAllReferencesDirectCallees(variable, callbackBody)) continue;
-
-          // Also require at least one call site in the body. The handler may be listed in the
-          // dependency array without being used inside the callback (a stray dep) — wrapping it
-          // in `useEffectEvent` produces dead code, so do not report.
-          const callSites = collectCallSitesOfVariable(variable, callbackBody);
-          if (callSites.length === 0) continue;
-
-          const eventName = `${handlerName}Event`;
+        for (const violation of violations) {
+          const eventName = `${violation.handlerName}Event`;
           const insertScope = context.sourceCode.getScope(node);
           // Drop the autofix when the coined name would clash with an existing binding visible in
           // the effect scope. Renaming to `${name}Event_1` etc. would force the user to read a
           // generated suffix; reporting without a fix lets them pick a name that fits the codebase.
-          const canAutofix = isBindingNameAvailable(eventName, insertScope, callbackArg);
+          const canAutofix = isBindingNameAvailable(eventName, insertScope, violation.callbackArg);
           const capturedReactImport = reactImport;
           const capturedExportName = useEffectEventExportName;
 
           context.report({
-            node: element,
+            node: violation.depElement,
             messageId: "preferUseEffectEvent",
-            data: { handlerName },
+            data: { handlerName: violation.handlerName },
             fix: canAutofix
-              ? (fixer) => {
-                  const src = context.sourceCode.getText();
-                  const fixes: Fix[] = [];
-
-                  const eventCalleeText = resolveEventCalleeText(
+              ? (fixer) =>
+                  buildViolationFix(
+                    violation,
                     capturedReactImport,
                     capturedExportName,
-                  );
-
-                  // 1. Add useEffectEvent to the named React imports if it isn't there yet.
-                  if (
-                    capturedReactImport !== null &&
-                    capturedReactImport.useEffectEventLocalName === null
-                  ) {
-                    const namedSpecifiers = capturedReactImport.node.specifiers.filter(
-                      (s) => s.type === "ImportSpecifier",
-                    );
-                    const lastNamed = namedSpecifiers[namedSpecifiers.length - 1];
-                    // When the import has only a default/namespace specifier we don't need to
-                    // add a named one — the fix uses `<ns>.useEffectEvent` instead.
-                    if (lastNamed) {
-                      fixes.push(
-                        fixer.insertTextAfterRange(lastNamed.range, `, ${capturedExportName}`),
-                      );
-                    }
-                  }
-
-                  // 2. Insert the wrapping declaration just before the useEffect call.
-                  const [nodeStart] = node.range;
-                  const lineStart = src.lastIndexOf("\n", nodeStart - 1) + 1;
-                  const indent = src.slice(lineStart, nodeStart);
-                  fixes.push(
-                    fixer.insertTextBeforeRange(
-                      node.range,
-                      `const ${eventName} = ${eventCalleeText}(${handlerName});\n${indent}`,
-                    ),
-                  );
-
-                  // 3. Replace handler call sites within the callback body. Works uniformly for
-                  // block and expression bodies because the call sites are looked up by scope
-                  // references, not by AST shape.
-                  for (const call of callSites) {
-                    fixes.push(fixer.replaceTextRange(call.callee.range, eventName));
-                  }
-
-                  // 4. Drop the handler from the dependency array.
-                  const remaining: string[] = [];
-                  const [elementStart] = element.range;
-                  for (const e of depsArg.elements) {
-                    if (!e) continue;
-                    const [eStart, eEnd] = e.range;
-                    if (eStart === elementStart) continue;
-                    remaining.push(src.slice(eStart, eEnd));
-                  }
-                  fixes.push(fixer.replaceTextRange(depsArg.range, `[${remaining.join(", ")}]`));
-
-                  return fixes;
-                }
+                    context.sourceCode,
+                    fixer,
+                  )
               : undefined,
           });
         }
@@ -494,57 +334,5 @@ const preferUseEffectEvent = defineRule({
     };
   },
 });
-
-/**
- * Decide which expression text to use as the wrapper callee.
- *
- * Priority:
- *
- * 1. An existing `useEffectEvent` (or `experimental_useEffectEvent`) named import — use the local
- *    name.
- * 2. A React namespace/default import with no named specifiers — use `<ns>.useEffectEvent`.
- * 3. Otherwise — use the export name determined by options (added to named imports by the fix).
- */
-function resolveEventCalleeText(reactImport: ReactImportState | null, exportName: string): string {
-  if (reactImport === null) return exportName;
-  if (reactImport.useEffectEventLocalName !== null) {
-    return reactImport.useEffectEventLocalName;
-  }
-  const hasNamedSpecifier = reactImport.node.specifiers.some((s) => s.type === "ImportSpecifier");
-  if (!hasNamedSpecifier && reactImport.namespaceLocalName !== null) {
-    return `${reactImport.namespaceLocalName}.${exportName}`;
-  }
-  return exportName;
-}
-
-/**
- * Decide whether a `CallExpression` is the React `useEffect` we care about.
- *
- * Recognises both the named-import form (`useEffect(...)`) and the namespace/default form
- * (`React.useEffect(...)`). Filters by identifier name first to avoid resolving every call site
- * through the scope manager.
- */
-function isUseEffectCall(
-  node: ESTree.CallExpression,
-  reactImport: ReactImportState | null,
-  index: ScopeIndex,
-): boolean {
-  const { callee } = node;
-  if (callee.type === "Identifier") {
-    if (reactImport?.useEffectVariable && reactImport.useEffectLocalName !== null) {
-      if (callee.name !== reactImport.useEffectLocalName) return false;
-      return index.resolveReference(callee) === reactImport.useEffectVariable;
-    }
-    return callee.name === USE_EFFECT_EXPORT;
-  }
-  if (callee.type === "MemberExpression" && !callee.computed) {
-    if (callee.property.type !== "Identifier") return false;
-    if (callee.property.name !== USE_EFFECT_EXPORT) return false;
-    if (callee.object.type !== "Identifier") return false;
-    if (!reactImport?.namespaceVariable) return false;
-    return index.resolveReference(callee.object) === reactImport.namespaceVariable;
-  }
-  return false;
-}
 
 export default preferUseEffectEvent;
