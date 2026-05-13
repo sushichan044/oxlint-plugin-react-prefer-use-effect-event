@@ -1,6 +1,9 @@
 /**
  * `prefer-use-effect-event` rule, structured as three phases.
  *
+ * Effect hooks recognised: `useEffect`, `useLayoutEffect`, `useInsertionEffect`. All three share
+ * the same dependency-array semantics, so the rule treats them uniformly.
+ *
  * ## Inputs
  *
  * - `targets: TargetSpec[]` — handler bindings to track. Empty disables the rule for the file.
@@ -11,7 +14,8 @@
  *
  * Builds per-file state read by Detect/Fix:
  *
- * - `ReactImportState` — `useEffect` binding/local-name, default/namespace specifier, existing
+ * - `ReactImportState` — per-hook binding/local-name map for `useEffect` / `useLayoutEffect` /
+ *   `useInsertionEffect`, default/namespace specifier, existing
  *   `useEffectEvent`/`experimental_useEffectEvent` local name.
  * - `trackedHandlers` — Variable → TargetSpec, indexed by handler kind:
  *
@@ -21,8 +25,8 @@
  *
  * ## Detect (`CallExpression`)
  *
- * For every Identifier in the dependency array of a `useEffect` call, emit a `HandlerViolation` iff
- * all four conditions hold:
+ * For every Identifier in the dependency array of an effect hook call, emit a `HandlerViolation`
+ * iff all four conditions hold:
  *
  * 1. The Identifier resolves to a tracked handler.
  * 2. The first argument is an inline arrow / function expression with a body.
@@ -30,8 +34,9 @@
  *    reassignment, no JSX use).
  * 4. The body contains at least one such call site (a stray dep is ignored).
  *
- * `useEffect` is recognised as the named-import form (via `reactImport.useEffectVariable`) or the
- * `<ns>.useEffect` form (via `reactImport.namespaceVariable`); other shapes are rejected.
+ * Effect hooks are recognised as the named-import form (via `reactImport.effectHookBindings`) or
+ * the `<ns>.useEffect` / `<ns>.useLayoutEffect` / `<ns>.useInsertionEffect` form (via
+ * `reactImport.namespaceVariable`); other shapes are rejected.
  *
  * ## Fix (when `${handlerName}Event` is available in the insertion scope)
  *
@@ -39,7 +44,7 @@
  *
  * - Fix-A — Add `useEffectEvent` to the React named imports if missing. Skipped when the local name
  *   is already known or when the React import has only a default/namespace specifier.
- * - Fix-B — Insert `const ${handlerName}Event = <calleeText>(${handlerName});` before the `useEffect`
+ * - Fix-B — Insert `const ${handlerName}Event = <calleeText>(${handlerName});` before the effect hook
  *   call.
  * - Fix-C — Replace each direct-callee call site inside the callback body with the wrapper name.
  * - Fix-D — Remove the handler from the dependency array.
@@ -57,9 +62,10 @@ import {
 } from "./handler-collection";
 import {
   collectReactImport,
+  EFFECT_HOOK_NAMES,
   EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT,
+  isEffectHookCall,
   isReactImport,
-  isUseEffectCall,
   type ReactImportState,
   USE_EFFECT_EVENT_EXPORT,
 } from "./react-import-state";
@@ -90,7 +96,7 @@ const preferUseEffectEvent = defineRule({
     type: "problem",
     docs: {
       description:
-        "Wrap event handlers passed into `useEffect` with `useEffectEvent` to avoid stale closures and unnecessary effect re-runs.",
+        "Wrap event handlers passed into React effect hooks (`useEffect`, `useLayoutEffect`, `useInsertionEffect`) with `useEffectEvent` to avoid stale closures and unnecessary effect re-runs.",
       url: getRuleDocsURL("prefer-use-effect-event"),
     },
     messages: {
@@ -110,7 +116,7 @@ const preferUseEffectEvent = defineRule({
           targets: {
             type: "array",
             description:
-              "Handler bindings inside `useEffect` that should be wrapped with `useEffectEvent`.",
+              "Handler bindings inside React effect hooks (`useEffect`, `useLayoutEffect`, `useInsertionEffect`) that should be wrapped with `useEffectEvent`.",
             items: {
               type: "object",
               additionalProperties: false,
@@ -257,8 +263,9 @@ const preferUseEffectEvent = defineRule({
         hasFileTargets = fileTargets.some((t) => t.source.from === "file");
         // No targets means no rule output is possible — skip the file entirely.
         if (fileTargets.length === 0) return false;
-        // Skip the file if it doesn't contain useEffect at all.
-        if (!context.sourceCode.text.includes("useEffect")) {
+        // Skip the file when it doesn't mention any of the effect hooks the rule looks at.
+        const text = context.sourceCode.text;
+        if (!EFFECT_HOOK_NAMES.some((name) => text.includes(name))) {
           return false;
         }
 
@@ -300,7 +307,7 @@ const preferUseEffectEvent = defineRule({
         if (tracking.trackedHandlers.size === 0) return;
 
         const index = ensureScopeIndex();
-        if (!isUseEffectCall(node, reactImport, index)) return;
+        if (!isEffectHookCall(node, reactImport, index)) return;
 
         const violations = detectViolations(node, index, tracking.trackedHandlers);
 

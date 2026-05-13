@@ -2,10 +2,27 @@ import type { ESTree, Variable } from "@oxlint/plugins";
 import type { ScopeIndex } from "./scope-utils";
 
 const REACT_PACKAGE = "react";
-const USE_EFFECT_EXPORT = "useEffect";
+
+export const EFFECT_HOOK_NAMES = ["useEffect", "useLayoutEffect", "useInsertionEffect"] as const;
+export type EffectHookName = (typeof EFFECT_HOOK_NAMES)[number];
+
+const EFFECT_HOOK_NAME_SET: ReadonlySet<string> = new Set(EFFECT_HOOK_NAMES);
 
 export const USE_EFFECT_EVENT_EXPORT = "useEffectEvent";
 export const EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT = "experimental_useEffectEvent";
+
+/**
+ * One imported effect hook binding (the resolved `Variable` and the local name actually used in
+ * source — accounting for `as` aliases). Stored per hook name in `ReactImportState`.
+ *
+ * @example
+ *   import { useEffect } from "react"; // { variable, localName: "useEffect" }
+ *   import { useLayoutEffect as ule } from "react"; // { variable, localName: "ule" }
+ */
+export type EffectHookBinding = {
+  variable: Variable;
+  localName: string;
+};
 
 export type ReactImportState = {
   /**
@@ -17,23 +34,17 @@ export type ReactImportState = {
    */
   node: ESTree.ImportDeclaration;
   /**
-   * Variable bound to the named `useEffect` specifier, if present. `null` when the file uses only a
-   * default/namespace import.
+   * Imported effect hook bindings, keyed by the React export name. Only hooks present in the
+   * `import` declaration appear in the map; absent hooks have no entry.
    *
    * @example
-   *   import { useEffect } from "react"; // the `useEffect` binding
-   *   import React from "react"; // null
+   *   import { useEffect, useLayoutEffect as ule } from "react";
+   *   // Map {
+   *   //   "useEffect" => { variable, localName: "useEffect" },
+   *   //   "useLayoutEffect" => { variable, localName: "ule" },
+   *   // }
    */
-  useEffectVariable: Variable | null;
-  /**
-   * Local name of the `useEffect` named specifier (i.e. the `as` alias if renamed). Used as a
-   * fast-path filter before resolving identifier references.
-   *
-   * @example
-   *   import { useEffect } from "react"; // "useEffect"
-   *   import { useEffect as ue } from "react"; // "ue"
-   */
-  useEffectLocalName: string | null;
+  effectHookBindings: Map<EffectHookName, EffectHookBinding>;
   /**
    * Local name under which `useEffectEvent` (or `experimental_useEffectEvent`) is already imported,
    * accounting for `as` aliases. `null` when no event binding is imported yet.
@@ -79,8 +90,7 @@ export function collectReactImport(
   node: ESTree.ImportDeclaration,
   index: ScopeIndex,
 ): ReactImportState {
-  let useEffectVariable: Variable | null = null;
-  let useEffectLocalName: string | null = null;
+  const effectHookBindings = new Map<EffectHookName, EffectHookBinding>();
   let useEffectEventLocalName: string | null = null;
   let namespaceVariable: Variable | null = null;
   let namespaceLocalName: string | null = null;
@@ -96,9 +106,11 @@ export function collectReactImport(
     }
     if (specifier.type === "ImportSpecifier" && specifier.imported.type === "Identifier") {
       const importedName = specifier.imported.name;
-      if (importedName === USE_EFFECT_EXPORT) {
-        useEffectVariable = index.resolveDeclaration(specifier.local);
-        useEffectLocalName = specifier.local.name;
+      if (isEffectHookName(importedName)) {
+        const variable = index.resolveDeclaration(specifier.local);
+        if (variable) {
+          effectHookBindings.set(importedName, { variable, localName: specifier.local.name });
+        }
       } else if (
         importedName === USE_EFFECT_EVENT_EXPORT ||
         importedName === EXPERIMENTAL_USE_EFFECT_EVENT_EXPORT
@@ -110,12 +122,15 @@ export function collectReactImport(
 
   return {
     node,
-    useEffectVariable,
-    useEffectLocalName,
+    effectHookBindings,
     useEffectEventLocalName,
     namespaceVariable,
     namespaceLocalName,
   };
+}
+
+function isEffectHookName(name: string): name is EffectHookName {
+  return EFFECT_HOOK_NAME_SET.has(name);
 }
 
 /**
@@ -141,28 +156,37 @@ export function resolveEventCalleeText(state: ReactImportState | null, exportNam
 }
 
 /**
- * Decide whether a `CallExpression` is the React `useEffect` we care about.
+ * Decide whether a `CallExpression` is a React effect hook the rule cares about (`useEffect`,
+ * `useLayoutEffect`, or `useInsertionEffect`).
  *
  * Recognises both the named-import form (`useEffect(...)`) and the namespace/default form
  * (`React.useEffect(...)`). Filters by identifier name first to avoid resolving every call site
  * through the scope manager.
  */
-export function isUseEffectCall(
+export function isEffectHookCall(
   node: ESTree.CallExpression,
   state: ReactImportState | null,
   index: ScopeIndex,
 ): boolean {
   const { callee } = node;
   if (callee.type === "Identifier") {
-    if (state?.useEffectVariable && state.useEffectLocalName !== null) {
-      if (callee.name !== state.useEffectLocalName) return false;
-      return index.resolveReference(callee) === state.useEffectVariable;
+    if (state) {
+      for (const binding of state.effectHookBindings.values()) {
+        if (callee.name !== binding.localName) continue;
+        if (index.resolveReference(callee) === binding.variable) return true;
+      }
+      // Fall through: no React effect hook binding matched. If the file imports React but no
+      // effect hooks, treat a bare `useEffect(...)` etc. as not-a-hook — it would shadow a local.
+      if (state.effectHookBindings.size > 0) return false;
     }
-    return callee.name === USE_EFFECT_EXPORT;
+    // No React import detected (or React imported only as namespace/default): fall back to the
+    // bare identifier match so files that call `useEffect(...)` without an explicit named import
+    // are still recognised.
+    return isEffectHookName(callee.name);
   }
   if (callee.type === "MemberExpression" && !callee.computed) {
     if (callee.property.type !== "Identifier") return false;
-    if (callee.property.name !== USE_EFFECT_EXPORT) return false;
+    if (!isEffectHookName(callee.property.name)) return false;
     if (callee.object.type !== "Identifier") return false;
     if (!state?.namespaceVariable) return false;
     return index.resolveReference(callee.object) === state.namespaceVariable;

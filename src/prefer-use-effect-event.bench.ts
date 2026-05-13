@@ -50,7 +50,7 @@ export const Component${i} = () => {
 `;
 
 // 2. `useEffect` is used but no tracked imports — every CallExpression must run
-//    `isUseEffectCall`, but no handlers ever match.
+//    `isEffectHookCall`, but no handlers ever match.
 const useEffectNoTracked = `
 import { useEffect, useState } from "react";
 ${Array.from(

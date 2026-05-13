@@ -1160,6 +1160,195 @@ const Component = () => {
     });
   });
 
+  describe("effect hook variants", () => {
+    it("rewrites a useLayoutEffect that depends on a hook return value", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useLayoutEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useLayoutEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useLayoutEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useLayoutEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a useInsertionEffect that depends on a directly imported handler", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useInsertionEffect } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  useInsertionEffect(() => {
+    notify();
+  }, [notify]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "notify" } }],
+              output: `import { useInsertionEffect, useEffectEvent } from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  const notifyEvent = useEffectEvent(notify);
+  useInsertionEffect(() => {
+    notifyEvent();
+  }, []);
+};`,
+              options: valueOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a React.useLayoutEffect call via namespace import", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import React from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  React.useLayoutEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import React from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = React.useEffectEvent(navigate);
+  React.useLayoutEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a React.useInsertionEffect call via namespace import", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import * as React from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  React.useInsertionEffect(() => {
+    notify();
+  }, [notify]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "notify" } }],
+              output: `import * as React from "react";
+import { notify } from "pkg";
+
+const Component = () => {
+  const notifyEvent = React.useEffectEvent(notify);
+  React.useInsertionEffect(() => {
+    notifyEvent();
+  }, []);
+};`,
+              options: valueOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("works through `import as` rename of useLayoutEffect", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useLayoutEffect as ule } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  ule(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useLayoutEffect as ule, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  ule(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag a useLayoutEffect-named local function", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              // `useLayoutEffect` here is a user-defined function, not the React hook. The plugin
+              // must not match it just because the name happens to coincide with the React export.
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+function useLayoutEffect(cb, deps) {}
+
+const Component = () => {
+  const navigate = useNavigate();
+  useLayoutEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
   // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
   // the dedicated resolver unit tests and the e2e fixture rigs.

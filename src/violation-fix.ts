@@ -57,7 +57,7 @@ function addUseEffectEventImport(
 
 /**
  * Fix-B — Insert `const ${eventName} = ${calleeText}(${handlerName});\n${indent}` immediately
- * before the `useEffect` call, mirroring its column.
+ * before the effect hook call, mirroring its column.
  */
 function insertWrapperDeclaration(
   fixes: Fix[],
@@ -68,12 +68,12 @@ function insertWrapperDeclaration(
   eventCalleeText: string,
 ): void {
   const text = sourceCode.getText();
-  const [nodeStart] = violation.useEffectNode.range;
+  const [nodeStart] = violation.effectNode.range;
   const lineStart = text.lastIndexOf("\n", nodeStart - 1) + 1;
   const indent = text.slice(lineStart, nodeStart);
   fixes.push(
     fixer.insertTextBeforeRange(
-      violation.useEffectNode.range,
+      violation.effectNode.range,
       `const ${eventName} = ${eventCalleeText}(${violation.handlerName});\n${indent}`,
     ),
   );
