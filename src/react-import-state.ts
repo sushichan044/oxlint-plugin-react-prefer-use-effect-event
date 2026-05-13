@@ -180,9 +180,10 @@ export function isEffectHookCall(
       if (state.effectHookBindings.size > 0) return false;
     }
     // No React import detected (or React imported only as namespace/default): fall back to the
-    // bare identifier match so files that call `useEffect(...)` without an explicit named import
-    // are still recognised.
-    return isEffectHookName(callee.name);
+    // bare identifier match, but only when the identifier is not bound to a local binding.
+    // If resolveReference returns a variable, the name belongs to a local function/variable that
+    // shadows the hook name — don't treat it as a React hook call.
+    return index.resolveReference(callee) == null && isEffectHookName(callee.name);
   }
   if (callee.type === "MemberExpression" && !callee.computed) {
     if (callee.property.type !== "Identifier") return false;

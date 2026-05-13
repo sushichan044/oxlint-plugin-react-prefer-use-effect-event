@@ -1347,6 +1347,31 @@ const Component = () => {
         });
       }).not.toThrow();
     });
+
+    it("does not flag a useLayoutEffect-named local function when React is not imported", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              // No React import at all: `useLayoutEffect` is a local function.
+              // The bare-name fallback must not fire when the identifier resolves to a local binding.
+              code: `import { useNavigate } from "react-router";
+
+function useLayoutEffect(cb, deps) {}
+
+const Component = () => {
+  const navigate = useNavigate();
+  useLayoutEffect(() => {
+    navigate("/path");
+  }, [navigate]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
   });
 
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
