@@ -1,6 +1,6 @@
 # oxlint-plugin-react-prefer-use-effect-event/prefer-use-effect-event
 
-📝 Wrap event handlers passed into `useEffect` with `useEffectEvent` to avoid stale closures and unnecessary effect re-runs.
+📝 Wrap event handlers passed into React effect hooks (`useEffect`, `useLayoutEffect`, `useInsertionEffect`) with `useEffectEvent` to avoid stale closures and unnecessary effect re-runs.
 
 🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 
@@ -8,9 +8,19 @@
 
 ## Rule Details
 
-This rule reports calls inside `useEffect` to handlers that originate from configured `targets` (e.g. `navigate` returned by `useNavigate`), and suggests wrapping them with [`useEffectEvent`](https://react.dev/reference/react/experimental_useEffectEvent).
+This rule reports calls inside any of `useEffect`, `useLayoutEffect`, or `useInsertionEffect` to handlers that originate from configured `targets` (e.g. `navigate` returned by `useNavigate`), and suggests wrapping them with [`useEffectEvent`](https://react.dev/reference/react/experimental_useEffectEvent).
 
 Without `useEffectEvent`, including such handlers in the dependency array often causes effects to re-run more than intended, while omitting them produces stale closures.
+
+## Supported hooks
+
+The rule treats all three React effect hooks uniformly — the detection conditions and the autofix shape are identical regardless of which hook the handler appears in:
+
+- `useEffect`
+- `useLayoutEffect`
+- `useInsertionEffect`
+
+Both the named-import form (`useEffect(...)`) and the namespace form (`React.useEffect(...)`) are recognised. Aliased imports (`import { useLayoutEffect as ule } from "react"`) work too.
 
 ### ❌ Incorrect
 
@@ -53,7 +63,7 @@ export function RedirectOnAuth({ user }) {
 When the `--fix` flag is used, the rule automatically:
 
 1. Adds `useEffectEvent` (or `experimental_useEffectEvent`) to the React import
-2. Inserts a wrapper const before the `useEffect` call
+2. Inserts a wrapper const before the effect hook call
 3. Rewrites call sites inside the effect callback to use the wrapper
 4. Removes the handler from the dependency array
 
@@ -77,7 +87,7 @@ useEffect(() => {
 
 ## Detection scope
 
-The rule fires only when **every** reference to the handler inside the `useEffect` callback body is a direct call (`handler(...)`). Callback shape doesn't matter — arrow with block body, arrow with expression body (`useEffect(() => handler(), deps)`), and function expressions (`useEffect(function () { … }, deps)`) are all detected and fixed the same way.
+The rule fires only when **every** reference to the handler inside the effect hook callback body is a direct call (`handler(...)`). Callback shape doesn't matter — arrow with block body, arrow with expression body (`useEffect(() => handler(), deps)`), and function expressions (`useEffect(function () { … }, deps)`) are all detected and fixed the same way.
 
 The rule deliberately does **not** fire when the handler appears in any non-callee position inside the callback, such as:
 
