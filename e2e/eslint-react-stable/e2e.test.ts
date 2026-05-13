@@ -20,6 +20,10 @@ describe("e2e: react-stable-eslint-espree", () => {
       file: "basic.jsx",
       case: "works with useEffectEvent",
     },
+    {
+      file: "missing-dep.jsx",
+      case: "rewrites a handler called inside the effect but missing from deps",
+    },
   ];
 
   it.each(tc)("$case", async ({ file }) => {

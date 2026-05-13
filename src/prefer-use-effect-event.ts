@@ -25,14 +25,20 @@
  *
  * ## Detect (`CallExpression`)
  *
- * For every Identifier in the dependency array of an effect hook call, emit a `HandlerViolation`
- * iff all four conditions hold:
+ * Runs in two passes against the same four conditions:
  *
- * 1. The Identifier resolves to a tracked handler.
+ * 1. The handler resolves to a variable in `trackedHandlers`.
  * 2. The first argument is an inline arrow / function expression with a body.
  * 3. Every reference to the handler inside that body is a direct callee (no value pass, no
  *    reassignment, no JSX use).
  * 4. The body contains at least one such call site (a stray dep is ignored).
+ *
+ * Phase 1 — handler is listed in the dep array. Report target is the dep Identifier and Fix-D
+ * removes it from the array.
+ *
+ * Phase 2 — handler is referenced from the callback but missing from the dep array
+ * (`react-hooks/exhaustive-deps` was suppressed). Report target is the first call site and the dep
+ * array is left untouched. Handlers consumed by Phase 1 are skipped to avoid double reports.
  *
  * Effect hooks are recognised as the named-import form (via `reactImport.effectHookBindings`) or
  * the `<ns>.useEffect` / `<ns>.useLayoutEffect` / `<ns>.useInsertionEffect` form (via
@@ -47,7 +53,8 @@
  * - Fix-B — Insert `const ${handlerName}Event = <calleeText>(${handlerName});` before the effect hook
  *   call.
  * - Fix-C — Replace each direct-callee call site inside the callback body with the wrapper name.
- * - Fix-D — Remove the handler from the dependency array.
+ * - Fix-D — Remove the handler from the dependency array. Skipped for Phase 2 violations (handler
+ *   missing from deps) so the array is left untouched.
  *
  * `<calleeText>` priority: existing `useEffectEvent` local name → `<ns>.useEffectEvent` (when the
  * React import has no named specifiers) → the export name from options (added by Fix-A).
@@ -321,8 +328,13 @@ const preferUseEffectEvent = defineRule({
           const capturedReactImport = reactImport;
           const capturedExportName = useEffectEventExportName;
 
+          // Report at the dep Identifier when the handler is listed in deps; otherwise point at
+          // the first call site so the diagnostic lands on something the user can see in their
+          // editor without scrolling to the dep array (which doesn't contain this handler).
+          const reportNode = violation.depElement ?? violation.callSites[0].callee;
+
           context.report({
-            node: violation.depElement,
+            node: reportNode,
             messageId: "preferUseEffectEvent",
             data: { handlerName: violation.handlerName },
             fix: canAutofix

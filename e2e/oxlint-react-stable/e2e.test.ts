@@ -21,6 +21,10 @@ describe("e2e: react-stable", () => {
       case: "works with useEffectEvent",
     },
     {
+      file: "missing-dep.tsx",
+      case: "rewrites a handler called inside the effect but missing from deps",
+    },
+    {
       file: "file-source/Component.tsx",
       case: "resolves a file-source target through tsconfig paths",
     },

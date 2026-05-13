@@ -26,7 +26,12 @@ export function buildViolationFix(
   addUseEffectEventImport(fixes, fixer, reactImport, exportName);
   insertWrapperDeclaration(fixes, fixer, violation, sourceCode, eventName, eventCalleeText);
   replaceCallSites(fixes, fixer, violation, eventName);
-  removeFromDepsArray(fixes, fixer, violation, sourceCode);
+  // Fix-D runs only when the handler is actually present in the dep array. When the violation was
+  // detected purely from a call site (handler missing from deps), leave the array untouched —
+  // removing nothing avoids changing the effect's resubscribe behaviour the user explicitly chose.
+  if (violation.depElement !== null) {
+    removeFromDepsArray(fixes, fixer, sourceCode, violation.depElement);
+  }
 
   return fixes;
 }
@@ -106,28 +111,28 @@ function replaceCallSites(
 function removeFromDepsArray(
   fixes: Fix[],
   fixer: Fixer,
-  violation: HandlerViolation,
   sourceCode: SourceCode,
+  depElement: NonNullable<HandlerViolation["depElement"]>,
 ): void {
-  const tokenAfter = sourceCode.getTokenAfter(violation.depElement);
+  const tokenAfter = sourceCode.getTokenAfter(depElement);
   if (tokenAfter && tokenAfter.value === ",") {
     // Extend the removal up to the next token so the inter-element whitespace goes with the
     // comma, leaving `[a, c]` rather than `[a,  c]` when `b` is removed.
     const tokenAfterComma = sourceCode.getTokenAfter(tokenAfter);
     const removeEnd = tokenAfterComma ? tokenAfterComma.range[0] : tokenAfter.range[1];
-    fixes.push(fixer.removeRange([violation.depElement.range[0], removeEnd]));
+    fixes.push(fixer.removeRange([depElement.range[0], removeEnd]));
     return;
   }
 
-  const tokenBefore = sourceCode.getTokenBefore(violation.depElement);
+  const tokenBefore = sourceCode.getTokenBefore(depElement);
   if (tokenBefore && tokenBefore.value === ",") {
     // Last element: start the removal at the previous token's end so the comma and the
     // whitespace before this element are consumed together.
     const tokenBeforeComma = sourceCode.getTokenBefore(tokenBefore);
     const removeStart = tokenBeforeComma ? tokenBeforeComma.range[1] : tokenBefore.range[0];
-    fixes.push(fixer.removeRange([removeStart, violation.depElement.range[1]]));
+    fixes.push(fixer.removeRange([removeStart, depElement.range[1]]));
     return;
   }
 
-  fixes.push(fixer.removeRange(violation.depElement.range));
+  fixes.push(fixer.removeRange(depElement.range));
 }

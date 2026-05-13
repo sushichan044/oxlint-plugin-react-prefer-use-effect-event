@@ -1374,6 +1374,388 @@ const Component = () => {
     });
   });
 
+  describe("handler missing from dependency array", () => {
+    // When a handler is called inside an effect callback but is intentionally omitted from the
+    // dependency array (often via `react-hooks/exhaustive-deps` suppression), the rule should
+    // still rewrite the call. The dep array is left untouched because the user explicitly chose
+    // not to resubscribe on that dep.
+
+    it("rewrites the issue #17 navigate sample", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const RedirectOnLogout = ({ user }) => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const RedirectOnLogout = ({ user }) => {
+  const navigate = useNavigate();
+
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    if (!user) {
+      navigateEvent("/login");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a handler called inside an effect with an empty dep array", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, []);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/path");
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("leaves the dep array untouched when other identifiers are listed", () => {
+      // Output must keep `[user]` exactly — Fix-D does not run for Phase 2 violations.
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate(user.path);
+  }, [user]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent(user.path);
+  }, [user]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("replaces every call site when the handler is called multiple times", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/before");
+    if (user) navigate("/after");
+  }, [user]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent("/before");
+    if (user) navigateEvent("/after");
+  }, [user]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a React namespace useEffect call when the handler is missing from deps", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import * as React from "react";
+import { notify } from "pkg";
+
+const Component = ({ user }) => {
+  React.useEffect(() => {
+    notify(user);
+  }, [user]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "notify" } }],
+              output: `import * as React from "react";
+import { notify } from "pkg";
+
+const Component = ({ user }) => {
+  const notifyEvent = React.useEffectEvent(notify);
+  React.useEffect(() => {
+    notifyEvent(user);
+  }, [user]);
+};`,
+              options: valueOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("uses experimental_useEffectEvent when configured", () => {
+      const experimentalOptions = [
+        {
+          targets: callReturnOptions[0].targets,
+          experimentalUseEffectEvent: true,
+        },
+      ] satisfies Options;
+
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate(user.path);
+  }, [user]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, experimental_useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  const navigateEvent = experimental_useEffectEvent(navigate);
+  useEffect(() => {
+    navigateEvent(user.path);
+  }, [user]);
+};`,
+              options: experimentalOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("rewrites a handler called inside a nested block", () => {
+      expect(() => {
+        runRule({
+          valid: [],
+          invalid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    try {
+      if (user) {
+        navigate(user.path);
+      }
+    } catch {}
+  }, [user]);
+};`,
+              errors: [{ messageId: "preferUseEffectEvent", data: { handlerName: "navigate" } }],
+              output: `import { useEffect, useEffectEvent } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  const navigateEvent = useEffectEvent(navigate);
+  useEffect(() => {
+    try {
+      if (user) {
+        navigateEvent(user.path);
+      }
+    } catch {}
+  }, [user]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the effect hook has no dependency array argument", () => {
+      // A literal dep array is one of the rule's safety gates. `useEffect(() => {...})` runs on
+      // every render and is a different bug class — exhaustive-deps catches that.
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  });
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the dependency argument is a variable reference", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ deps }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+  }, deps);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the callback is not an inline function", () => {
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const cb = () => {};
+
+const Component = () => {
+  const navigate = useNavigate();
+  navigate; // module-level reference to satisfy lint
+  useEffect(cb, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the handler has any non-callee reference inside the callback", () => {
+      // Mixing a direct call with `subscribe(navigate)` would leave a dangling reference if Fix-C
+      // rewrote only the call sites. Phase 2 honours the same gate as Phase 1.
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ subscribe }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate("/path");
+    subscribe(navigate);
+  }, []);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+
+    it("does not flag when the handler is declared but never called inside the callback", () => {
+      // The handler is in scope but the body does nothing with it — nothing to wrap.
+      expect(() => {
+        runRule({
+          valid: [
+            {
+              code: `import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+const Component = ({ user }) => {
+  const navigate = useNavigate();
+  navigate; // outside the effect, no-op to keep the binding "used"
+  useEffect(() => {
+    if (!user) {
+      // no navigate call
+    }
+  }, [user]);
+};`,
+              options: callReturnOptions,
+            },
+          ],
+          invalid: [],
+        });
+      }).not.toThrow();
+    });
+  });
+
   // `from: "file"` requires resolving import sources against a real `tsconfig.json` and walking
   // up to find an `.oxlintrc.json`, which `RuleTester` cannot stage in-memory. Coverage lives in
   // the dedicated resolver unit tests and the e2e fixture rigs.
