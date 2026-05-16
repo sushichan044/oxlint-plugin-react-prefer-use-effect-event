@@ -42,6 +42,22 @@ export function collectCallSitesOfVariable(
 }
 
 /**
+ * Whether `variable` has at least one reference whose identifier sits within `range`.
+ *
+ * Used as a cheap pre-filter before running the heavier callee/call-site checks on every tracked
+ * handler. Returns `false` when the variable is never referenced inside the body, so the rule can
+ * skip handlers declared elsewhere in the component without touching them.
+ */
+export function hasReferenceInRange(variable: Variable, range: { range: Range }): boolean {
+  const [rangeStart, rangeEnd] = range.range;
+  for (const ref of variable.references) {
+    const [idStart, idEnd] = ref.identifier.range;
+    if (idStart >= rangeStart && idEnd <= rangeEnd) return true;
+  }
+  return false;
+}
+
+/**
  * Whether every reference of `variable` inside `range` is the direct callee of a `CallExpression`
  * (`f(...)` style). Returns `true` when there are no references in range.
  *
