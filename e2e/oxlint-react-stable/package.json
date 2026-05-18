@@ -6,7 +6,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "react": "19.2.5",
+    "react": "19.2.6",
     "react-hot-toast": "catalog:dev",
     "react-router": "catalog:fixture"
   },
