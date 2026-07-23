@@ -6,26 +6,26 @@ allowBuilds:
 catalogs:
   dev:
     '@arethetypeswrong/core': 0.18.2
-    '@types/node': 25.6.0
+    '@types/node': 26.1.1
     '@typescript/native-preview': 7.0.0-dev.20260430.1
     '@virtual-live-lab/tsconfig': 2.1.21
-    eslint: 9.39.2
+    eslint: 10.7.0
     eslint-doc-generator: 3.3.2
     fs-fixture: 2.13.0
     oxfmt: 0.47.0
     oxlint: 1.62.0
-    oxlint-tsgolint: 0.22.1
+    oxlint-tsgolint: 7.0.2001
     pkg-pr-new: 0.0.69
     publint: 0.3.18
     react-hot-toast: 2.6.0
     release-it: 20.0.1
     release-it-pnpm: 4.6.6
     tsdown: 0.21.10
-    typescript: 6.0.3
+    typescript: 7.0.2
     unplugin-unused: 0.5.7
     vitest: 4.1.5
   fixture:
-    react-router: 7.14.2
+    react-router: 8.2.0
   prod:
     '@oxlint/plugins': 1.62.0
     empathic: 2.0.0

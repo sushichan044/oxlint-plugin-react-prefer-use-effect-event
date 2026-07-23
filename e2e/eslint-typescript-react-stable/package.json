@@ -6,13 +6,13 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "react": "19.2.5",
+    "react": "19.2.8",
     "react-router": "catalog:fixture"
   },
   "devDependencies": {
     "@types/node": "catalog:dev",
-    "@types/react": "19.2.14",
-    "eslint": "10.2.1",
+    "@types/react": "19.2.17",
+    "eslint": "10.7.0",
     "oxlint-plugin-react-prefer-use-effect-event": "workspace:*",
     "typescript-eslint": "8.59.1",
     "vitest": "catalog:dev"
