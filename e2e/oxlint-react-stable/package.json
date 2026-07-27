@@ -6,13 +6,13 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "react": "19.2.5",
+    "react": "19.2.8",
     "react-hot-toast": "catalog:dev",
     "react-router": "catalog:fixture"
   },
   "devDependencies": {
     "@types/node": "catalog:dev",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.17",
     "oxlint-plugin-react-prefer-use-effect-event": "workspace:*",
     "vitest": "catalog:dev"
   }
